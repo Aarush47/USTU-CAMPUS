@@ -17,6 +17,13 @@ import {
   X
 } from "lucide-react";
 import { useState } from "react";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
+
+type StudentProfile = {
+  name?: string;
+  roll_no?: string;
+  department?: string;
+};
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -36,6 +43,19 @@ const navItems = [
 export function Layout() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { data: profiles } = useSupabaseTable<StudentProfile>(["student_profile", "profile", "students"], {
+    fallbackData: [],
+  });
+
+  const student = profiles[0];
+  const initials = student?.name
+    ? student.name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "NA";
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -62,7 +82,7 @@ export function Layout() {
                 <GraduationCap className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">DigiHub</h1>
+                <h1 className="text-xl font-semibold text-foreground">USTU CAMPUS</h1>
                 <p className="text-xs text-muted-foreground">College Portal</p>
               </div>
             </div>
@@ -105,11 +125,11 @@ export function Layout() {
           <div className="p-4 border-t border-border">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-secondary-foreground">AS</span>
+                <span className="text-sm font-medium text-secondary-foreground">{initials}</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Arjun Sharma</p>
-                <p className="text-xs text-muted-foreground">CS - 2023</p>
+                <p className="text-sm font-medium text-foreground">{student?.name ?? "No profile"}</p>
+                <p className="text-xs text-muted-foreground">{student?.roll_no ?? "-"}</p>
               </div>
             </div>
           </div>
@@ -125,7 +145,7 @@ export function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <GraduationCap className="w-6 h-6 text-primary" />
-            <span className="font-semibold">DigiHub</span>
+            <span className="font-semibold">USTU CAMPUS</span>
           </div>
           <div className="w-6" />
         </header>

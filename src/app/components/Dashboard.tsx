@@ -10,6 +10,30 @@ import {
   Clock
 } from "lucide-react";
 import { Card } from "./ui/card";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
+
+type NoticeItem = {
+  id: number;
+  title: string;
+  date: string;
+  category: string;
+  urgent?: boolean;
+};
+
+type ClassItem = {
+  id?: number;
+  time: string;
+  subject: string;
+  room: string;
+  status: "completed" | "ongoing" | "upcoming";
+};
+
+type EventItem = {
+  id?: number;
+  date: string;
+  title: string;
+  type: "deadline" | "event" | "exam";
+};
 
 const stats = [
   {
@@ -46,49 +70,33 @@ const stats = [
   },
 ];
 
-const recentNotices = [
-  {
-    id: 1,
-    title: "Mid-Semester Examinations Schedule Released",
-    date: "2026-02-14",
-    category: "Academic",
-    urgent: true
-  },
-  {
-    id: 2,
-    title: "Workshop on AI/ML - Registration Open",
-    date: "2026-02-13",
-    category: "Events"
-  },
-  {
-    id: 3,
-    title: "Library Hours Extended During Exam Week",
-    date: "2026-02-12",
-    category: "Library"
-  },
-  {
-    id: 4,
-    title: "Sports Day - March 5th, 2026",
-    date: "2026-02-10",
-    category: "Sports"
-  }
-];
-
-const todaysClasses = [
-  { time: "09:00 AM", subject: "Data Structures", room: "CS-301", status: "completed" },
-  { time: "11:00 AM", subject: "Database Management", room: "CS-205", status: "completed" },
-  { time: "02:00 PM", subject: "Computer Networks", room: "CS-401", status: "ongoing" },
-  { time: "04:00 PM", subject: "Software Engineering", room: "CS-302", status: "upcoming" },
-];
-
-const upcomingEvents = [
-  { date: "Feb 18", title: "Assignment Submission - DBMS", type: "deadline" },
-  { date: "Feb 20", title: "Guest Lecture - Cloud Computing", type: "event" },
-  { date: "Feb 25", title: "Mid-Sem Exams Begin", type: "exam" },
-  { date: "Mar 05", title: "Annual Sports Day", type: "event" },
-];
-
 export function Dashboard() {
+  const {
+    data: recentNotices,
+    loading: noticesLoading,
+  } = useSupabaseTable<NoticeItem>(["notices", "notice_board"], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: false },
+    limit: 4,
+  });
+
+  const {
+    data: todaysClasses,
+    loading: classesLoading,
+  } = useSupabaseTable<ClassItem>(["todays_classes", "classes"], {
+    fallbackData: [],
+    orderBy: { column: "time", ascending: true },
+  });
+
+  const {
+    data: upcomingEvents,
+    loading: eventsLoading,
+  } = useSupabaseTable<EventItem>(["upcoming_events", "events"], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: true },
+    limit: 4,
+  });
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -136,6 +144,9 @@ export function Dashboard() {
             </Link>
           </div>
           <div className="space-y-3">
+            {classesLoading && (
+              <p className="text-sm text-muted-foreground">Loading classes from Supabase...</p>
+            )}
             {todaysClasses.map((cls, index) => (
               <div key={index} className="flex items-center gap-4 p-3 bg-muted rounded-lg">
                 <div className="flex flex-col items-center min-w-[80px]">
@@ -168,6 +179,9 @@ export function Dashboard() {
             <h2 className="text-xl font-semibold">Upcoming Events</h2>
           </div>
           <div className="space-y-3">
+            {eventsLoading && (
+              <p className="text-sm text-muted-foreground">Loading events from Supabase...</p>
+            )}
             {upcomingEvents.map((event, index) => (
               <div key={index} className="flex gap-3">
                 <div className="flex flex-col items-center min-w-[50px] p-2 bg-secondary rounded-lg">
@@ -202,6 +216,9 @@ export function Dashboard() {
           </Link>
         </div>
         <div className="space-y-3">
+          {noticesLoading && (
+            <p className="text-sm text-muted-foreground">Loading notices from Supabase...</p>
+          )}
           {recentNotices.map((notice) => (
             <div key={notice.id} className="flex items-start justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
               <div className="flex-1">

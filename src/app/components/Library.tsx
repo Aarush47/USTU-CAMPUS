@@ -4,99 +4,39 @@ import { Input } from "./ui/input";
 import { BookOpen, Search, Calendar, User, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const issuedBooks = [
-  {
-    id: 1,
-    title: "Introduction to Algorithms",
-    author: "Thomas H. Cormen",
-    isbn: "978-0262033848",
-    issueDate: "2026-01-15",
-    dueDate: "2026-02-28",
-    status: "Active",
-    fine: 0,
-  },
-  {
-    id: 2,
-    title: "Database System Concepts",
-    author: "Abraham Silberschatz",
-    isbn: "978-0073523323",
-    issueDate: "2026-01-20",
-    dueDate: "2026-03-05",
-    status: "Active",
-    fine: 0,
-  },
-  {
-    id: 3,
-    title: "Computer Networks",
-    author: "Andrew S. Tanenbaum",
-    isbn: "978-0132126953",
-    issueDate: "2026-01-10",
-    dueDate: "2026-02-23",
-    status: "Overdue",
-    fine: 50,
-  },
-];
+type IssuedBook = {
+  id: number;
+  title: string;
+  author: string;
+  isbn: string;
+  issueDate: string;
+  dueDate: string;
+  status: string;
+  fine: number;
+};
 
-const availableBooks = [
-  {
-    id: 101,
-    title: "Clean Code",
-    author: "Robert C. Martin",
-    isbn: "978-0132350884",
-    category: "Software Engineering",
-    copies: 3,
-    shelf: "A-24",
-  },
-  {
-    id: 102,
-    title: "Design Patterns",
-    author: "Erich Gamma",
-    isbn: "978-0201633610",
-    category: "Software Engineering",
-    copies: 2,
-    shelf: "A-25",
-  },
-  {
-    id: 103,
-    title: "Operating System Concepts",
-    author: "Abraham Silberschatz",
-    isbn: "978-1118063330",
-    category: "Operating Systems",
-    copies: 5,
-    shelf: "B-12",
-  },
-  {
-    id: 104,
-    title: "Artificial Intelligence: A Modern Approach",
-    author: "Stuart Russell",
-    isbn: "978-0136042594",
-    category: "AI & ML",
-    copies: 4,
-    shelf: "C-08",
-  },
-  {
-    id: 105,
-    title: "Python Crash Course",
-    author: "Eric Matthes",
-    isbn: "978-1593279288",
-    category: "Programming",
-    copies: 6,
-    shelf: "D-15",
-  },
-  {
-    id: 106,
-    title: "The Pragmatic Programmer",
-    author: "David Thomas",
-    isbn: "978-0135957059",
-    category: "Software Engineering",
-    copies: 3,
-    shelf: "A-26",
-  },
-];
+type AvailableBook = {
+  id: number;
+  title: string;
+  author: string;
+  isbn: string;
+  category: string;
+  copies: number;
+  shelf: string;
+};
 
 export function Library() {
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: issuedBooks } = useSupabaseTable<IssuedBook>(["issued_books", "books_issued"], {
+    fallbackData: [],
+  });
+
+  const { data: availableBooks } = useSupabaseTable<AvailableBook>(["available_books", "books"], {
+    fallbackData: [],
+  });
 
   const filteredBooks = availableBooks.filter(
     (book) =>

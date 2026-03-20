@@ -3,95 +3,28 @@ import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Bell, Search, Pin, Calendar, User, FileText } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const notices = [
-  {
-    id: 1,
-    title: "Mid-Semester Examination Schedule Released",
-    content: "The mid-semester examination schedule for all courses has been released. Please check your timetable and prepare accordingly. Exams will begin from March 1st, 2026.",
-    date: "2026-02-14",
-    category: "Examinations",
-    author: "Examination Cell",
-    pinned: true,
-    urgent: true,
-  },
-  {
-    id: 2,
-    title: "Workshop on Machine Learning - Registration Open",
-    content: "A 3-day workshop on Advanced Machine Learning techniques will be conducted from Feb 20-22. Interested students can register through the student portal. Limited seats available.",
-    date: "2026-02-13",
-    category: "Events",
-    author: "CSE Department",
-    pinned: true,
-    urgent: false,
-  },
-  {
-    id: 3,
-    title: "Library Timing Extended During Exams",
-    content: "The central library will remain open till 11:00 PM during the examination period. Students can avail this facility for their preparation.",
-    date: "2026-02-12",
-    category: "Facilities",
-    author: "Library Administration",
-    pinned: false,
-    urgent: false,
-  },
-  {
-    id: 4,
-    title: "Final Year Project Submission Deadline",
-    content: "All final year students must submit their project reports by February 28th, 2026. Late submissions will not be accepted without prior approval.",
-    date: "2026-02-10",
-    category: "Academics",
-    author: "Academic Section",
-    pinned: false,
-    urgent: true,
-  },
-  {
-    id: 5,
-    title: "Annual Sports Day - February 25th",
-    content: "The annual sports day will be held on February 25th, 2026. Students interested in participating should register with the sports coordinator by February 18th.",
-    date: "2026-02-09",
-    category: "Events",
-    author: "Sports Committee",
-    pinned: false,
-    urgent: false,
-  },
-  {
-    id: 6,
-    title: "Hostel Fee Payment Reminder",
-    content: "Students residing in hostels are reminded to clear their pending dues by February 20th to avoid late fees.",
-    date: "2026-02-08",
-    category: "Administrative",
-    author: "Hostel Administration",
-    pinned: false,
-    urgent: false,
-  },
-  {
-    id: 7,
-    title: "Guest Lecture on Cloud Computing",
-    content: "A guest lecture by industry expert Mr. Rahul Mehta on 'Future of Cloud Computing' will be conducted on February 22nd at 3:00 PM in Auditorium A.",
-    date: "2026-02-07",
-    category: "Events",
-    author: "CSE Department",
-    pinned: false,
-    urgent: false,
-  },
-  {
-    id: 8,
-    title: "Scholarship Application Deadline",
-    content: "Last date to apply for merit-based scholarships for the next semester is February 28th. Apply through the scholarship portal.",
-    date: "2026-02-06",
-    category: "Academics",
-    author: "Scholarship Cell",
-    pinned: false,
-    urgent: true,
-  },
-];
+type Notice = {
+  id: number;
+  title: string;
+  content: string;
+  date: string;
+  category: string;
+  author: string;
+  pinned: boolean;
+  urgent: boolean;
+};
 
 const categories = ["All", "Examinations", "Events", "Academics", "Facilities", "Administrative"];
 
 export function NoticeBoard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const { data: notices, loading } = useSupabaseTable<Notice>(["notices", "notice_board"], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: false },
+  });
 
   const filteredNotices = notices
     .filter((notice) => {
@@ -147,6 +80,7 @@ export function NoticeBoard() {
 
       {/* Notices List */}
       <div className="space-y-4">
+        {loading && <p className="text-sm text-muted-foreground">Loading notices from Supabase...</p>}
         {filteredNotices.length === 0 ? (
           <Card className="p-12 text-center border border-border">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />

@@ -1,45 +1,65 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { UserCheck, QrCode, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import QRCode from "qrcode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const attendanceData = [
-  { subject: "Data Structures", present: 42, total: 48, percentage: 87.5 },
-  { subject: "Database Management", present: 45, total: 48, percentage: 93.75 },
-  { subject: "Computer Networks", present: 38, total: 48, percentage: 79.17 },
-  { subject: "Software Engineering", present: 44, total: 48, percentage: 91.67 },
-  { subject: "Operating Systems", present: 40, total: 48, percentage: 83.33 },
-  { subject: "Web Technologies", present: 46, total: 48, percentage: 95.83 },
-];
+type SubjectAttendance = {
+  subject: string;
+  present: number;
+  total: number;
+  percentage: number;
+};
 
-const recentAttendance = [
-  { date: "2026-02-14", subject: "Data Structures", status: "Present", time: "9:15 AM" },
-  { date: "2026-02-14", subject: "Database Management", status: "Present", time: "10:20 AM" },
-  { date: "2026-02-13", subject: "Computer Networks", status: "Absent", time: "-" },
-  { date: "2026-02-13", subject: "Software Engineering", status: "Present", time: "1:35 PM" },
-  { date: "2026-02-12", subject: "Web Technologies", status: "Present", time: "9:10 AM" },
-  { date: "2026-02-12", subject: "Operating Systems", status: "Present", time: "10:25 AM" },
-  { date: "2026-02-11", subject: "Data Structures", status: "Present", time: "9:12 AM" },
-  { date: "2026-02-11", subject: "Database Management", status: "Late", time: "10:35 AM" },
-];
+type AttendanceRecord = {
+  date: string;
+  subject: string;
+  status: string;
+  time: string;
+};
+
+type StudentProfile = {
+  name?: string;
+  roll_no?: string;
+};
 
 export function Attendance() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQR, setShowQR] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const { data: profiles } = useSupabaseTable<StudentProfile>(["student_profile", "profile", "students"], {
+    fallbackData: [],
+  });
+
+  const { data: attendanceData } = useSupabaseTable<SubjectAttendance>([
+    "attendance_by_subject",
+    "attandance",
+  ], {
+    fallbackData: [],
+  });
+
+  const { data: recentAttendance } = useSupabaseTable<AttendanceRecord>([
+    "attendance_records",
+    "attandance",
+  ], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: false },
+    limit: 20,
+  });
 
   const overallAttendance =
-    (attendanceData.reduce((sum, item) => sum + item.present, 0) /
-      attendanceData.reduce((sum, item) => sum + item.total, 0)) *
-    100;
+    ((attendanceData.reduce((sum, item) => sum + item.present, 0) /
+      Math.max(attendanceData.reduce((sum, item) => sum + item.total, 0), 1)) *
+      100);
 
   const generateQRCode = async () => {
+    const studentProfile = profiles[0];
     const studentData = {
-      studentId: "CS2023001",
-      name: "Arjun Sharma",
+      studentId: studentProfile?.roll_no ?? "-",
+      name: studentProfile?.name ?? "-",
       timestamp: new Date().toISOString(),
       location: "Room 301",
     };
@@ -154,7 +174,7 @@ export function Attendance() {
               {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />}
             </div>
             <div className="mt-6 space-y-2">
-              <p className="text-sm text-muted-foreground">Student ID: CS2023001</p>
+              <p className="text-sm text-muted-foreground">Student ID: {profiles[0]?.roll_no ?? "-"}</p>
               <p className="text-sm text-muted-foreground">Valid for: 30 seconds</p>
             </div>
             <Button onClick={() => setShowQR(false)} variant="outline" className="mt-4">

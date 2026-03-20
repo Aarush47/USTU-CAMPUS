@@ -2,46 +2,34 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { DollarSign, Calendar, CheckCircle, Clock, Download, CreditCard, AlertCircle } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const feeStructure = [
-  { category: "Tuition Fee", amount: 45000, status: "Paid", date: "2025-08-15" },
-  { category: "Library Fee", amount: 2000, status: "Paid", date: "2025-08-15" },
-  { category: "Laboratory Fee", amount: 5000, status: "Paid", date: "2025-08-15" },
-  { category: "Sports Fee", amount: 1500, status: "Paid", date: "2025-08-15" },
-  { category: "Development Fee", amount: 3000, status: "Paid", date: "2025-08-15" },
-  { category: "Examination Fee", amount: 2500, status: "Pending", date: "-" },
-  { category: "Hostel Fee (Semester 6)", amount: 15000, status: "Pending", date: "-" },
-  { category: "Mess Fee (February)", amount: 4500, status: "Pending", date: "-" },
-];
+type FeeItem = {
+  category: string;
+  amount: number;
+  status: "Paid" | "Pending";
+  date: string;
+};
 
-const paymentHistory = [
-  {
-    id: "TXN20250815001",
-    description: "Semester 5 Fees Payment",
-    amount: 56500,
-    date: "2025-08-15",
-    method: "UPI",
-    status: "Success",
-  },
-  {
-    id: "TXN20250201001",
-    description: "Hostel & Mess Fee - January",
-    amount: 19500,
-    date: "2025-02-01",
-    method: "Net Banking",
-    status: "Success",
-  },
-  {
-    id: "TXN20250101001",
-    description: "Mess Fee - December",
-    amount: 4500,
-    date: "2025-01-01",
-    method: "Credit Card",
-    status: "Success",
-  },
-];
+type PaymentItem = {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  method: string;
+  status: string;
+};
 
 export function Fees() {
+  const { data: feeStructure } = useSupabaseTable<FeeItem>(["fee_structure", "fees"], {
+    fallbackData: [],
+  });
+
+  const { data: paymentHistory } = useSupabaseTable<PaymentItem>(["payment_history", "payments"], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: false },
+  });
+
   const totalPaid = feeStructure
     .filter((fee) => fee.status === "Paid")
     .reduce((sum, fee) => sum + fee.amount, 0);

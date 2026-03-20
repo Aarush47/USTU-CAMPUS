@@ -2,107 +2,26 @@ import { Card } from "./ui/card";
 import { Award, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const semesterMarks = [
-  {
-    subject: "Data Structures",
-    internal1: 18,
-    internal2: 22,
-    internal3: 20,
-    assignment: 9,
-    total: 69,
-    maxMarks: 80,
-    grade: "A",
-  },
-  {
-    subject: "Database Management",
-    internal1: 20,
-    internal2: 24,
-    internal3: 23,
-    assignment: 10,
-    total: 77,
-    maxMarks: 80,
-    grade: "A+",
-  },
-  {
-    subject: "Computer Networks",
-    internal1: 16,
-    internal2: 19,
-    internal3: 18,
-    assignment: 8,
-    total: 61,
-    maxMarks: 80,
-    grade: "B+",
-  },
-  {
-    subject: "Software Engineering",
-    internal1: 21,
-    internal2: 23,
-    internal3: 22,
-    assignment: 9,
-    total: 75,
-    maxMarks: 80,
-    grade: "A+",
-  },
-  {
-    subject: "Operating Systems",
-    internal1: 19,
-    internal2: 21,
-    internal3: 20,
-    assignment: 9,
-    total: 69,
-    maxMarks: 80,
-    grade: "A",
-  },
-  {
-    subject: "Web Technologies",
-    internal1: 22,
-    internal2: 24,
-    internal3: 23,
-    assignment: 10,
-    total: 79,
-    maxMarks: 80,
-    grade: "A+",
-  },
-];
+type SemesterMark = {
+  subject: string;
+  internal1: number;
+  internal2: number;
+  internal3: number;
+  assignment: number;
+  total: number;
+  maxMarks: number;
+  grade: string;
+};
 
-const previousSemesters = [
-  {
-    semester: 5,
-    sgpa: 8.9,
-    subjects: 6,
-    totalMarks: 450,
-    maxMarks: 500,
-  },
-  {
-    semester: 4,
-    sgpa: 8.5,
-    subjects: 6,
-    totalMarks: 425,
-    maxMarks: 500,
-  },
-  {
-    semester: 3,
-    sgpa: 8.7,
-    subjects: 6,
-    totalMarks: 435,
-    maxMarks: 500,
-  },
-  {
-    semester: 2,
-    sgpa: 8.3,
-    subjects: 6,
-    totalMarks: 415,
-    maxMarks: 500,
-  },
-  {
-    semester: 1,
-    sgpa: 8.1,
-    subjects: 6,
-    totalMarks: 405,
-    maxMarks: 500,
-  },
-];
+type PreviousSemester = {
+  semester: number;
+  sgpa: number;
+  subjects: number;
+  totalMarks: number;
+  maxMarks: number;
+};
 
 const getGradeColor = (grade: string) => {
   if (grade.startsWith("A")) return "bg-emerald-500";
@@ -112,9 +31,18 @@ const getGradeColor = (grade: string) => {
 };
 
 export function Marks() {
+  const { data: semesterMarks } = useSupabaseTable<SemesterMark>(["semester_marks", "marks"], {
+    fallbackData: [],
+  });
+
+  const { data: previousSemesters } = useSupabaseTable<PreviousSemester>(["previous_semesters", "semesters"], {
+    fallbackData: [],
+    orderBy: { column: "semester", ascending: false },
+  });
+
   const currentSemesterTotal = semesterMarks.reduce((sum, subject) => sum + subject.total, 0);
   const currentSemesterMax = semesterMarks.reduce((sum, subject) => sum + subject.maxMarks, 0);
-  const currentPercentage = (currentSemesterTotal / currentSemesterMax) * 100;
+  const currentPercentage = currentSemesterMax ? (currentSemesterTotal / currentSemesterMax) * 100 : 0;
   const currentCGPA = 8.6;
 
   return (

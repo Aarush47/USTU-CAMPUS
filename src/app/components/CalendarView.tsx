@@ -3,63 +3,17 @@ import { Card } from "./ui/card";
 import { Calendar } from "./ui/calendar";
 import { Badge } from "./ui/badge";
 import { Calendar as CalendarIcon, Clock, MapPin, Users, Bell } from "lucide-react";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const events = [
-  {
-    id: 1,
-    title: "Mid-Semester Examination",
-    date: new Date(2026, 2, 1),
-    time: "9:00 AM - 12:00 PM",
-    location: "Examination Hall A",
-    type: "exam",
-    description: "Data Structures Mid-Sem Exam",
-  },
-  {
-    id: 2,
-    title: "Machine Learning Workshop",
-    date: new Date(2026, 1, 20),
-    time: "2:00 PM - 5:00 PM",
-    location: "Seminar Hall",
-    type: "event",
-    description: "Advanced ML techniques workshop",
-  },
-  {
-    id: 3,
-    title: "Project Presentation",
-    date: new Date(2026, 1, 22),
-    time: "10:00 AM - 1:00 PM",
-    location: "Lab 3",
-    type: "assignment",
-    description: "Mini Project final presentation",
-  },
-  {
-    id: 4,
-    title: "Sports Day",
-    date: new Date(2026, 1, 25),
-    time: "9:00 AM - 5:00 PM",
-    location: "Sports Ground",
-    type: "event",
-    description: "Annual college sports event",
-  },
-  {
-    id: 5,
-    title: "Project Submission Deadline",
-    date: new Date(2026, 1, 28),
-    time: "11:59 PM",
-    location: "Online Portal",
-    type: "assignment",
-    description: "Final year project report submission",
-  },
-  {
-    id: 6,
-    title: "Guest Lecture - Cloud Computing",
-    date: new Date(2026, 1, 22),
-    time: "3:00 PM - 4:30 PM",
-    location: "Auditorium A",
-    type: "event",
-    description: "Industry expert talk on cloud technologies",
-  },
-];
+type CalendarEvent = {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  type: string;
+  description: string;
+};
 
 const getTypeColor = (type: string) => {
   switch (type) {
@@ -78,31 +32,33 @@ const getTypeColor = (type: string) => {
 
 export function CalendarView() {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const { data: events, loading } = useSupabaseTable<CalendarEvent>(["calendar_events", "events"], {
+    fallbackData: [],
+    orderBy: { column: "date", ascending: true },
+  });
 
   const selectedDateEvents = events.filter(
     (event) =>
       date &&
-      event.date.getDate() === date.getDate() &&
-      event.date.getMonth() === date.getMonth() &&
-      event.date.getFullYear() === date.getFullYear()
+      new Date(event.date).getDate() === date.getDate() &&
+      new Date(event.date).getMonth() === date.getMonth() &&
+      new Date(event.date).getFullYear() === date.getFullYear(),
   );
 
   const upcomingEvents = events
-    .filter((event) => event.date >= new Date())
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .filter((event) => new Date(event.date) >= new Date())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
 
-  const eventDates = events.map((event) => event.date);
+  const eventDates = events.map((event) => new Date(event.date));
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-semibold text-foreground">Academic Calendar</h1>
         <p className="text-muted-foreground mt-1">View your schedule, exams, and important events</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-5 border border-border">
           <div className="flex items-start justify-between">
@@ -121,7 +77,7 @@ export function CalendarView() {
             <div>
               <p className="text-sm text-muted-foreground">Upcoming Exams</p>
               <h3 className="text-2xl font-semibold text-foreground mt-2">
-                {events.filter((e) => e.type === "exam" && e.date >= new Date()).length}
+                {events.filter((e) => e.type === "exam" && new Date(e.date) >= new Date()).length}
               </h3>
             </div>
             <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
@@ -135,7 +91,7 @@ export function CalendarView() {
             <div>
               <p className="text-sm text-muted-foreground">Assignments Due</p>
               <h3 className="text-2xl font-semibold text-foreground mt-2">
-                {events.filter((e) => e.type === "assignment" && e.date >= new Date()).length}
+                {events.filter((e) => e.type === "assignment" && new Date(e.date) >= new Date()).length}
               </h3>
             </div>
             <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
@@ -149,11 +105,7 @@ export function CalendarView() {
             <div>
               <p className="text-sm text-muted-foreground">Events This Month</p>
               <h3 className="text-2xl font-semibold text-foreground mt-2">
-                {
-                  events.filter(
-                    (e) => e.date.getMonth() === new Date().getMonth() && e.type === "event"
-                  ).length
-                }
+                {events.filter((e) => new Date(e.date).getMonth() === new Date().getMonth() && e.type === "event").length}
               </h3>
             </div>
             <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
@@ -164,9 +116,9 @@ export function CalendarView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar */}
         <Card className="p-6 border border-border lg:col-span-2">
           <h2 className="text-lg font-semibold text-foreground mb-4">Calendar</h2>
+          {loading && <p className="text-sm text-muted-foreground mb-3">Loading events from Supabase...</p>}
           <div className="flex justify-center">
             <Calendar
               mode="single"
@@ -185,7 +137,6 @@ export function CalendarView() {
             />
           </div>
 
-          {/* Selected Date Events */}
           {selectedDateEvents.length > 0 && (
             <div className="mt-6 space-y-3">
               <h3 className="font-semibold text-foreground">
@@ -219,13 +170,12 @@ export function CalendarView() {
           )}
         </Card>
 
-        {/* Upcoming Events */}
         <Card className="p-6 border border-border">
           <h2 className="text-lg font-semibold text-foreground mb-4">Upcoming Events</h2>
           <div className="space-y-3">
             {upcomingEvents.map((event) => {
               const daysUntil = Math.ceil(
-                (event.date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                (new Date(event.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
               );
 
               return (
@@ -236,10 +186,10 @@ export function CalendarView() {
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-lg flex flex-col items-center justify-center">
                       <span className="text-xs text-primary font-medium">
-                        {event.date.toLocaleDateString("en-US", { month: "short" })}
+                        {new Date(event.date).toLocaleDateString("en-US", { month: "short" })}
                       </span>
                       <span className="text-lg font-semibold text-primary">
-                        {event.date.getDate()}
+                        {new Date(event.date).getDate()}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -262,7 +212,6 @@ export function CalendarView() {
         </Card>
       </div>
 
-      {/* Legend */}
       <Card className="p-4 border border-border">
         <p className="text-sm font-medium text-foreground mb-3">Event Types:</p>
         <div className="flex flex-wrap gap-3">

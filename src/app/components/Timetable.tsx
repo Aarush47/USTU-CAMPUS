@@ -1,55 +1,16 @@
 import { Card } from "./ui/card";
 import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
-const timetableData = {
-  Monday: [
-    { time: "9:00 - 10:00", subject: "Data Structures", room: "Room 301", professor: "Dr. Rajesh Kumar", type: "Lecture" },
-    { time: "10:15 - 11:15", subject: "Database Management", room: "Lab 2", professor: "Prof. Priya Singh", type: "Lab" },
-    { time: "11:30 - 12:30", subject: "Computer Networks", room: "Room 205", professor: "Dr. Amit Verma", type: "Lecture" },
-    { time: "12:30 - 1:30", subject: "Lunch Break", room: "-", professor: "-", type: "Break" },
-    { time: "1:30 - 2:30", subject: "Software Engineering", room: "Room 401", professor: "Prof. Sneha Patel", type: "Lecture" },
-    { time: "2:45 - 3:45", subject: "Web Technologies", room: "Lab 3", professor: "Dr. Karan Shah", type: "Lab" },
-  ],
-  Tuesday: [
-    { time: "9:00 - 10:00", subject: "Operating Systems", room: "Room 302", professor: "Dr. Meera Nair", type: "Lecture" },
-    { time: "10:15 - 11:15", subject: "Computer Networks", room: "Lab 1", professor: "Dr. Amit Verma", type: "Lab" },
-    { time: "11:30 - 12:30", subject: "Data Structures", room: "Room 301", professor: "Dr. Rajesh Kumar", type: "Tutorial" },
-    { time: "12:30 - 1:30", subject: "Lunch Break", room: "-", professor: "-", type: "Break" },
-    { time: "1:30 - 2:30", subject: "Database Management", room: "Room 203", professor: "Prof. Priya Singh", type: "Lecture" },
-    { time: "2:45 - 3:45", subject: "Soft Skills", room: "Room 105", professor: "Ms. Anita Roy", type: "Lecture" },
-  ],
-  Wednesday: [
-    { time: "9:00 - 10:00", subject: "Web Technologies", room: "Room 404", professor: "Dr. Karan Shah", type: "Lecture" },
-    { time: "10:15 - 11:15", subject: "Software Engineering", room: "Room 401", professor: "Prof. Sneha Patel", type: "Tutorial" },
-    { time: "11:30 - 12:30", subject: "Operating Systems", room: "Lab 2", professor: "Dr. Meera Nair", type: "Lab" },
-    { time: "12:30 - 1:30", subject: "Lunch Break", room: "-", professor: "-", type: "Break" },
-    { time: "1:30 - 2:30", subject: "Data Structures", room: "Room 301", professor: "Dr. Rajesh Kumar", type: "Lecture" },
-    { time: "2:45 - 3:45", subject: "Computer Networks", room: "Room 205", professor: "Dr. Amit Verma", type: "Lecture" },
-  ],
-  Thursday: [
-    { time: "9:00 - 10:00", subject: "Database Management", room: "Room 203", professor: "Prof. Priya Singh", type: "Lecture" },
-    { time: "10:15 - 11:15", subject: "Data Structures", room: "Lab 1", professor: "Dr. Rajesh Kumar", type: "Lab" },
-    { time: "11:30 - 12:30", subject: "Software Engineering", room: "Room 401", professor: "Prof. Sneha Patel", type: "Lecture" },
-    { time: "12:30 - 1:30", subject: "Lunch Break", room: "-", professor: "-", type: "Break" },
-    { time: "1:30 - 2:30", subject: "Web Technologies", room: "Room 404", professor: "Dr. Karan Shah", type: "Lecture" },
-    { time: "2:45 - 3:45", subject: "Operating Systems", room: "Room 302", professor: "Dr. Meera Nair", type: "Tutorial" },
-  ],
-  Friday: [
-    { time: "9:00 - 10:00", subject: "Computer Networks", room: "Room 205", professor: "Dr. Amit Verma", type: "Lecture" },
-    { time: "10:15 - 11:15", subject: "Operating Systems", room: "Room 302", professor: "Dr. Meera Nair", type: "Lecture" },
-    { time: "11:30 - 12:30", subject: "Database Management", room: "Lab 2", professor: "Prof. Priya Singh", type: "Lab" },
-    { time: "12:30 - 1:30", subject: "Lunch Break", room: "-", professor: "-", type: "Break" },
-    { time: "1:30 - 2:30", subject: "Mini Project", room: "Lab 3", professor: "All Faculty", type: "Project" },
-    { time: "2:45 - 3:45", subject: "Mini Project", room: "Lab 3", professor: "All Faculty", type: "Project" },
-  ],
-  Saturday: [
-    { time: "9:00 - 10:00", subject: "Seminar", room: "Auditorium A", professor: "Guest Speakers", type: "Seminar" },
-    { time: "10:15 - 11:15", subject: "Sports/Activities", room: "Sports Ground", professor: "-", type: "Activity" },
-    { time: "11:30 - 12:30", subject: "Club Activities", room: "Various Rooms", professor: "Club Coordinators", type: "Activity" },
-  ],
+type TimetableSlot = {
+  id?: number;
+  day: string;
+  time: string;
+  subject: string;
+  room: string;
+  professor: string;
+  type: string;
 };
-
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const getTypeColor = (type: string) => {
   switch (type) {
@@ -66,6 +27,11 @@ const getTypeColor = (type: string) => {
 
 export function Timetable() {
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const { data: slots, loading } = useSupabaseTable<TimetableSlot>(["timetable", "classes"], {
+    fallbackData: [],
+    orderBy: { column: "time", ascending: true },
+  });
+  const days = Array.from(new Set(slots.map((slot) => slot.day))).filter(Boolean);
 
   return (
     <div className="p-6 space-y-6">
@@ -90,6 +56,12 @@ export function Timetable() {
 
       {/* Timetable */}
       <div className="space-y-4">
+        {loading && <p className="text-sm text-muted-foreground">Loading timetable from Supabase...</p>}
+        {days.length === 0 && !loading && (
+          <Card className="p-6 border border-border">
+            <p className="text-sm text-muted-foreground">No timetable records found in database.</p>
+          </Card>
+        )}
         {days.map((day) => (
           <Card 
             key={day} 
@@ -110,7 +82,7 @@ export function Timetable() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {timetableData[day as keyof typeof timetableData].map((slot, idx) => (
+              {slots.filter((slot) => slot.day === day).map((slot, idx) => (
                 <div
                   key={idx}
                   className={`p-4 rounded-lg border border-border ${

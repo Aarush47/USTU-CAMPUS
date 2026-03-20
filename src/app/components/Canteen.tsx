@@ -3,6 +3,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useState } from "react";
+import { useSupabaseTable } from "../hooks/useSupabaseTable";
 
 type MenuItem = {
   id: number;
@@ -15,27 +16,14 @@ type MenuItem = {
   available: boolean;
 };
 
-const menuItems: MenuItem[] = [
-  { id: 1, name: "Veg Burger", category: "Fast Food", price: 60, image: "🍔", rating: 4.5, isVeg: true, available: true },
-  { id: 2, name: "Masala Dosa", category: "South Indian", price: 50, image: "🥞", rating: 4.8, isVeg: true, available: true },
-  { id: 3, name: "Paneer Sandwich", category: "Snacks", price: 45, image: "🥪", rating: 4.3, isVeg: true, available: true },
-  { id: 4, name: "Chicken Roll", category: "Fast Food", price: 80, image: "🌯", rating: 4.6, isVeg: false, available: true },
-  { id: 5, name: "Idli Sambar", category: "South Indian", price: 40, image: "🍚", rating: 4.7, isVeg: true, available: true },
-  { id: 6, name: "Pav Bhaji", category: "Main Course", price: 70, image: "🍛", rating: 4.4, isVeg: true, available: true },
-  { id: 7, name: "Pasta", category: "Continental", price: 90, image: "🍝", rating: 4.2, isVeg: true, available: true },
-  { id: 8, name: "Fried Rice", category: "Chinese", price: 85, image: "🍱", rating: 4.5, isVeg: true, available: true },
-  { id: 9, name: "Coffee", category: "Beverages", price: 25, image: "☕", rating: 4.6, isVeg: true, available: true },
-  { id: 10, name: "Mango Shake", category: "Beverages", price: 50, image: "🥤", rating: 4.8, isVeg: true, available: true },
-  { id: 11, name: "Samosa", category: "Snacks", price: 20, image: "🥟", rating: 4.4, isVeg: true, available: true },
-  { id: 12, name: "Pizza Slice", category: "Fast Food", price: 60, image: "🍕", rating: 4.3, isVeg: true, available: false },
-];
-
-const categories = ["All", "Fast Food", "South Indian", "Snacks", "Main Course", "Chinese", "Continental", "Beverages"];
-
 export function Canteen() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number }[]>([]);
+  const { data: menuItems, loading } = useSupabaseTable<MenuItem>(["canteen_menu", "menu_items"], {
+    fallbackData: [],
+  });
+  const categories = ["All", ...Array.from(new Set(menuItems.map((item) => item.category))).filter(Boolean)];
 
   const filteredItems = menuItems.filter((item) => {
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
@@ -131,6 +119,7 @@ export function Canteen() {
 
           {/* Menu Items */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading && <p className="text-sm text-muted-foreground">Loading menu from Supabase...</p>}
             {filteredItems.map((item) => (
               <Card key={item.id} className={`p-4 ${!item.available ? "opacity-60" : ""}`}>
                 <div className="flex gap-4">
