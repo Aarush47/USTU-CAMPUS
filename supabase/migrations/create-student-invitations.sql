@@ -41,13 +41,13 @@ create policy "teachers_see_own_invitations" on public.student_invitations for s
 );
 
 -- Teachers can create invitations
-drop policy if exists "teachers_create_invitations" on public.student_invitations for insert;
+drop policy if exists "teachers_create_invitations" on public.student_invitations;
 create policy "teachers_create_invitations" on public.student_invitations for insert with check (
   teacher_id = (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
 );
 
 -- Teachers can update their own invitations
-drop policy if exists "teachers_update_own_invitations" on public.student_invitations for update;
+drop policy if exists "teachers_update_own_invitations" on public.student_invitations;
 create policy "teachers_update_own_invitations" on public.student_invitations for update using (
   teacher_id = (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
 );
