@@ -17,18 +17,28 @@ export function useClerkUserSync() {
       try {
         const roleFromMetadata =
           (user.unsafeMetadata?.role as string | undefined) ||
-          (user.publicMetadata?.role as string | undefined) ||
-          "student";
+          (user.publicMetadata?.role as string | undefined);
 
-        const role = ["student", "teacher", "admin"].includes(roleFromMetadata)
-          ? roleFromMetadata
-          : "student";
+        const normalizedMetadataRole =
+          roleFromMetadata && ["student", "teacher", "admin"].includes(roleFromMetadata)
+            ? roleFromMetadata
+            : null;
 
         const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
         const displayName =
           user.firstName && user.lastName
             ? `${user.firstName} ${user.lastName}`
             : user.username || "User";
+
+        // Preserve existing role from DB to avoid accidental teacher->student downgrades.
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("role")
+          .or(`clerk_user_id.eq.${user.id},email.eq.${primaryEmail}`)
+          .limit(1)
+          .maybeSingle();
+
+        const role = existingUser?.role || normalizedMetadataRole || "student";
 
         // Keep users table in sync for role-based routing (student/teacher/admin).
         const { error: usersUpsertError } = await supabase
