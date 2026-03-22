@@ -15,6 +15,12 @@ import { Canteen } from "./components/Canteen";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ProtectedLayout } from "./components/ProtectedLayout";
+import { TeacherProtectedLayout } from "./components/TeacherProtectedLayout";
+import { TeacherDashboard } from "./pages/teacher/TeacherDashboard";
+import { TeacherClasses } from "./pages/teacher/TeacherClasses";
+import { TeacherAttendance } from "./pages/teacher/TeacherAttendance";
+import { TeacherAssignments } from "./pages/teacher/TeacherAssignments";
+import { TeacherResources } from "./pages/teacher/TeacherResources";
 
 export const router = createBrowserRouter([
   { path: "/sign-in", Component: SignInPage },
@@ -35,6 +41,17 @@ export const router = createBrowserRouter([
       { path: "calendar", Component: CalendarView },
       { path: "whiteboard", Component: Whiteboard },
       { path: "canteen", Component: Canteen },
+    ],
+  },
+  {
+    path: "/teacher",
+    Component: TeacherProtectedLayout,
+    children: [
+      { index: true, Component: TeacherDashboard },
+      { path: "classes", Component: TeacherClasses },
+      { path: "attendance", Component: TeacherAttendance },
+      { path: "assignments", Component: TeacherAssignments },
+      { path: "resources", Component: TeacherResources },
     ],
   },
 ]);
