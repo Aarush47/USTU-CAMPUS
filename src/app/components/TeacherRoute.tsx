@@ -35,11 +35,11 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
 
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // Check if user exists and is a teacher
+        // Prefer Clerk user ID lookup, fallback to email for legacy rows.
         const { data, error } = await supabase
           .from("users")
           .select("role")
-          .eq("email", user.emailAddresses[0].emailAddress)
+          .or(`clerk_user_id.eq.${user.id},email.eq.${user.emailAddresses[0].emailAddress}`)
           .single();
 
         if (error) {

@@ -13,6 +13,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { useState } from "react";
+import { useClerkUserSync } from "../hooks/useClerkUserSync";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher" },
@@ -24,6 +25,7 @@ const navItems = [
 ];
 
 export function TeacherLayout() {
+  useClerkUserSync();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 

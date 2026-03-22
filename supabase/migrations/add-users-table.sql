@@ -31,4 +31,20 @@ create policy "users_read_own" on public.users for select using (
 drop policy if exists "users_read_by_email" on public.users;
 create policy "users_read_by_email" on public.users for select using (true);
 
+-- RLS Policy: Allow app client to create users rows for USTU domain
+drop policy if exists "users_insert_ustu" on public.users;
+create policy "users_insert_ustu" on public.users for insert with check (
+  email ilike '%@ustu.edu.in'
+  and role in ('student', 'teacher', 'admin')
+);
+
+-- RLS Policy: Allow app client to update USTU users rows (role/profile sync)
+drop policy if exists "users_update_ustu" on public.users;
+create policy "users_update_ustu" on public.users for update using (
+  email ilike '%@ustu.edu.in'
+) with check (
+  email ilike '%@ustu.edu.in'
+  and role in ('student', 'teacher', 'admin')
+);
+
 commit;

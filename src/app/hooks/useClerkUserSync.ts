@@ -15,6 +15,45 @@ export function useClerkUserSync() {
 
     const syncUserToSupabase = async () => {
       try {
+        const roleFromMetadata =
+          (user.unsafeMetadata?.role as string | undefined) ||
+          (user.publicMetadata?.role as string | undefined) ||
+          "student";
+
+        const role = ["student", "teacher", "admin"].includes(roleFromMetadata)
+          ? roleFromMetadata
+          : "student";
+
+        const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
+        const displayName =
+          user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`
+            : user.username || "User";
+
+        // Keep users table in sync for role-based routing (student/teacher/admin).
+        const { error: usersUpsertError } = await supabase
+          .from("users")
+          .upsert(
+            {
+              clerk_user_id: user.id,
+              email: primaryEmail,
+              name: displayName,
+              role,
+              email_verified: true,
+              domain_verified: primaryEmail.endsWith("@ustu.edu.in"),
+            },
+            { onConflict: "email" }
+          );
+
+        if (usersUpsertError) {
+          console.error("Users sync error:", usersUpsertError);
+        }
+
+        // Teachers/admins don't need student_profile for core teacher routing.
+        if (role !== "student") {
+          return;
+        }
+
         // Check if profile already exists for this Clerk ID
         const { data: existing, error: fetchError } = await supabase
           .from("student_profile")
@@ -39,10 +78,8 @@ export function useClerkUserSync() {
           .upsert(
             {
               clerk_user_id: user.id,
-              email: user.primaryEmailAddress?.emailAddress || "",
-              name: user.firstName && user.lastName 
-                ? `${user.firstName} ${user.lastName}`
-                : user.username || "Student",
+              email: primaryEmail,
+              name: displayName,
             },
             { onConflict: "clerk_user_id" }
           );

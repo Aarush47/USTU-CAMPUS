@@ -128,16 +128,18 @@ export function UpdatedSignUpPage() {
         });
 
         // Create user record in database
-        const { data: userData, error: userError } = await supabase
+        const { error: userError } = await supabase
           .from("users")
-          .insert([
+          .upsert([
             {
+              clerk_user_id: result.createdUserId,
               email,
               role,
+              name: email.split("@")[0],
               domain_verified: true,
               email_verified: true,
             },
-          ]);
+          ], { onConflict: "email" });
 
         if (userError) {
           console.error("Error creating user record:", userError);
