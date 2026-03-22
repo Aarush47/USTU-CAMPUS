@@ -9,13 +9,15 @@ import {
   FileText,
   Menu,
   X,
-  GraduationCap
+  GraduationCap,
+  UserPlus
 } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher" },
   { icon: Users, label: "Classes", path: "/teacher/classes" },
+  { icon: UserPlus, label: "Manage Students", path: "/teacher/students" },
   { icon: Calendar, label: "Attendance", path: "/teacher/attendance" },
   { icon: ClipboardList, label: "Assignments", path: "/teacher/assignments" },
   { icon: FileText, label: "Resources", path: "/teacher/resources" },

@@ -13,7 +13,7 @@ import { CalendarView } from "./components/CalendarView";
 import { Whiteboard } from "./components/Whiteboard";
 import { Canteen } from "./components/Canteen";
 import { SignInPage } from "./pages/SignInPage";
-import { SignUpPage } from "./pages/SignUpPage";
+import { UpdatedSignUpPage } from "./pages/UpdatedSignUpPage";
 import { ProtectedLayout } from "./components/ProtectedLayout";
 import { TeacherProtectedLayout } from "./components/TeacherProtectedLayout";
 import { TeacherDashboard } from "./pages/teacher/TeacherDashboard";
@@ -21,10 +21,11 @@ import { TeacherClasses } from "./pages/teacher/TeacherClasses";
 import { TeacherAttendance } from "./pages/teacher/TeacherAttendance";
 import { TeacherAssignments } from "./pages/teacher/TeacherAssignments";
 import { TeacherResources } from "./pages/teacher/TeacherResources";
+import { ManageStudents } from "./pages/teacher/ManageStudents";
 
 export const router = createBrowserRouter([
   { path: "/sign-in", Component: SignInPage },
-  { path: "/sign-up", Component: SignUpPage },
+  { path: "/sign-up", Component: UpdatedSignUpPage },
   {
     path: "/",
     Component: ProtectedLayout,
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
       { path: "attendance", Component: TeacherAttendance },
       { path: "assignments", Component: TeacherAssignments },
       { path: "resources", Component: TeacherResources },
+      { path: "students", Component: ManageStudents },
     ],
   },
 ]);
