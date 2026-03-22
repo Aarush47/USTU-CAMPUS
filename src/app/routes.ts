@@ -22,6 +22,9 @@ import { TeacherAttendance } from "./pages/teacher/TeacherAttendance";
 import { TeacherAssignments } from "./pages/teacher/TeacherAssignments";
 import { TeacherResources } from "./pages/teacher/TeacherResources";
 import { ManageStudents } from "./pages/teacher/ManageStudents";
+import { AdminProtectedLayout } from "./components/AdminProtectedLayout";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { AdminAccounts } from "./pages/admin/AdminAccounts";
 
 export const router = createBrowserRouter([
   { path: "/sign-in", Component: SignInPage },
@@ -54,6 +57,14 @@ export const router = createBrowserRouter([
       { path: "assignments", Component: TeacherAssignments },
       { path: "resources", Component: TeacherResources },
       { path: "students", Component: ManageStudents },
+    ],
+  },
+  {
+    path: "/admin",
+    Component: AdminProtectedLayout,
+    children: [
+      { index: true, Component: AdminDashboard },
+      { path: "accounts", Component: AdminAccounts },
     ],
   },
 ]);

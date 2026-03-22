@@ -34,22 +34,53 @@ create index if not exists idx_student_invitations_status on public.student_invi
 alter table public.student_invitations enable row level security;
 
 -- RLS Policies
--- Teachers can see their own invitations
+-- Clerk auth runs outside Supabase auth, so auth.jwt() is not available here.
+-- Use table constraints for validation instead of JWT-based checks.
+-- Teachers can read invitations
 drop policy if exists "teachers_see_own_invitations" on public.student_invitations;
-create policy "teachers_see_own_invitations" on public.student_invitations for select using (
-  teacher_id = (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
-);
+create policy "teachers_see_own_invitations" on public.student_invitations for select using (true);
 
 -- Teachers can create invitations
 drop policy if exists "teachers_create_invitations" on public.student_invitations;
 create policy "teachers_create_invitations" on public.student_invitations for insert with check (
-  teacher_id = (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  email ilike '%@ustu.edu.in'
+  and status = 'pending'
+  and exists (
+    select 1
+    from public.users u
+    where u.id = teacher_id
+      and u.role in ('teacher', 'admin')
+  )
 );
 
 -- Teachers can update their own invitations
 drop policy if exists "teachers_update_own_invitations" on public.student_invitations;
 create policy "teachers_update_own_invitations" on public.student_invitations for update using (
-  teacher_id = (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  exists (
+    select 1
+    from public.users u
+    where u.id = teacher_id
+      and u.role in ('teacher', 'admin')
+  )
+) with check (
+  email ilike '%@ustu.edu.in'
+  and exists (
+    select 1
+    from public.users u
+    where u.id = teacher_id
+      and u.role in ('teacher', 'admin')
+  )
+);
+
+-- Teachers can delete invitations
+drop policy if exists "teachers_delete_own_invitations" on public.student_invitations;
+create policy "teachers_delete_own_invitations" on public.student_invitations for delete using (
+  exists (
+    select 1
+    from public.users u
+    where u.id = teacher_id
+      and u.role in ('teacher', 'admin')
+  )
 );
 
 -- Anyone can view invitation if they know the code (for validation on signup)

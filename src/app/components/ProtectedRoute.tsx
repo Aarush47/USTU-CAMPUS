@@ -68,7 +68,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/sign-in" replace />;
   }
 
-  if (userRole === "teacher" || userRole === "admin") {
+  if (userRole === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
+  if (userRole === "teacher") {
     return <Navigate to="/teacher" replace />;
   }
 

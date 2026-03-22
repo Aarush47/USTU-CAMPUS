@@ -109,6 +109,28 @@ export function UpdatedSignUpPage() {
       return;
     }
 
+    // Enforce admin pre-registration for both teacher and student accounts.
+    const { data: preRegisteredUser, error: preRegError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (preRegError) {
+      setError("Unable to verify account access. Please try again.");
+      return;
+    }
+
+    if (!preRegisteredUser) {
+      setError("❌ This email is not authorized by administration yet");
+      return;
+    }
+
+    if (preRegisteredUser.role !== role) {
+      setError(`❌ This email is registered as ${preRegisteredUser.role}, not ${role}`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
