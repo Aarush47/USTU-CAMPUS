@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router";
+import { UserButton } from "@clerk/clerk-react";
 import { 
   LayoutDashboard, 
   Bell, 
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { useClerkUserSync } from "../hooks/useClerkUserSync";
 
 type StudentProfile = {
   name?: string;
@@ -41,6 +43,7 @@ const navItems = [
 ];
 
 export function Layout() {
+  useClerkUserSync();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { data: profiles } = useSupabaseTable<StudentProfile>(["student_profile", "profile", "students"], {
@@ -121,8 +124,8 @@ export function Layout() {
             })}
           </nav>
 
-          {/* Student Info */}
-          <div className="p-4 border-t border-border">
+          {/* Student Info & Sign Out */}
+          <div className="p-4 border-t border-border flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-secondary-foreground">{initials}</span>
@@ -132,6 +135,7 @@ export function Layout() {
                 <p className="text-xs text-muted-foreground">{student?.roll_no ?? "-"}</p>
               </div>
             </div>
+            <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </div>
       </aside>

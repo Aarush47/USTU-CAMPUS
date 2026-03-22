@@ -17,10 +17,23 @@
   ```env
   VITE_SUPABASE_URL=https://your-project-ref.supabase.co
   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+  VITE_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
+  CLERK_SECRET_KEY=your-clerk-secret-key
   ```
 
   3. Run [supabase/bootstrap.sql](supabase/bootstrap.sql) in Supabase SQL Editor.
-  4. Restart the dev server after updating `.env`.
+  4. Then run [supabase/migrations/add-clerk-support.sql](supabase/migrations/add-clerk-support.sql) to add Clerk user columns and policies.
+  5. Restart the dev server after updating `.env`.
+
+  ## Authentication (Clerk)
+
+  - Users must sign in/sign up before accessing the app.
+  - First login syncs Clerk user data to Supabase student_profile table with `clerk_user_id`.
+  - Sign up/Sign in pages: `/sign-up` and `/sign-in`.
+  - All dashboard routes are protected and redirect unauthenticated users to sign-in.
+  - Use UserButton in sidebar to sign out.
+
+  ## Database Tables
 
   The app is DB-driven and expects these primary tables:
 

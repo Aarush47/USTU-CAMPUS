@@ -12,11 +12,16 @@ import { Marks } from "./components/Marks";
 import { CalendarView } from "./components/CalendarView";
 import { Whiteboard } from "./components/Whiteboard";
 import { Canteen } from "./components/Canteen";
+import { SignInPage } from "./pages/SignInPage";
+import { SignUpPage } from "./pages/SignUpPage";
+import { ProtectedLayout } from "./components/ProtectedLayout";
 
 export const router = createBrowserRouter([
+  { path: "/sign-in", Component: SignInPage },
+  { path: "/sign-up", Component: SignUpPage },
   {
     path: "/",
-    Component: Layout,
+    Component: ProtectedLayout,
     children: [
       { index: true, Component: Dashboard },
       { path: "notices", Component: NoticeBoard },

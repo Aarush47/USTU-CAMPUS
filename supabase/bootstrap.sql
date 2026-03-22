@@ -5,6 +5,7 @@ begin;
 
 create table if not exists public.student_profile (
   id bigint generated always as identity primary key,
+  clerk_user_id text unique,
   name text not null,
   roll_no text unique,
   email text,
