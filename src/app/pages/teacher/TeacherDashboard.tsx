@@ -1,5 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { Users, BookOpen, Calendar, ClipboardList } from "lucide-react";
+import { BackButton } from "../../components/BackButton";
 
 export function TeacherDashboard() {
   const { user } = useUser();
@@ -33,6 +34,10 @@ export function TeacherDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/student" />
+      </div>
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">

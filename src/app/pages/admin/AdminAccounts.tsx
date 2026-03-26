@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { useSupabaseTable } from "../../hooks/useSupabaseTable";
+import { BackButton } from "../../components/BackButton";
 
 type AccountRole = "teacher" | "student";
 
@@ -70,6 +71,10 @@ export function AdminAccounts() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/admin" />
+      </div>
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">Manage Accounts</h1>
         <p className="text-muted-foreground">Add teacher and student email IDs with role access.</p>

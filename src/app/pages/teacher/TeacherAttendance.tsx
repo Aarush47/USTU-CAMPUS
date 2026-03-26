@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Calendar, Check, X, Clock } from "lucide-react";
+import { BackButton } from "../../components/BackButton";
 
 type AttendanceRecord = {
   studentId: number;
@@ -38,6 +39,10 @@ export function TeacherAttendance() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/teacher" />
+      </div>
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">Mark Attendance</h1>

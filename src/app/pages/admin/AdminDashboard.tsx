@@ -1,5 +1,6 @@
 import { Shield, Users, UserCheck, GraduationCap } from "lucide-react";
 import { useSupabaseTable } from "../../hooks/useSupabaseTable";
+import { BackButton } from "../../components/BackButton";
 
 type UserRow = {
   id: number;
@@ -22,6 +23,10 @@ export function AdminDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/" />
+      </div>
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">Administration Dashboard</h1>
         <p className="text-muted-foreground">Manage teachers, students, and access policies.</p>

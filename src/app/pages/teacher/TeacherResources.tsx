@@ -1,5 +1,6 @@
 import { Plus, Upload, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { BackButton } from "../../components/BackButton";
 
 type Resource = {
   id: number;
@@ -18,6 +19,10 @@ export function TeacherResources() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/teacher" />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

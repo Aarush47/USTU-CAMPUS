@@ -3,6 +3,7 @@ import { Plus, Copy, CheckCircle, Clock, X, Trash2 } from "lucide-react";
 import { useSupabaseTable } from "../../hooks/useSupabaseTable";
 import { createClient } from "@supabase/supabase-js";
 import { useUser } from "@clerk/clerk-react";
+import { BackButton } from "../../components/BackButton";
 
 type StudentInvitation = {
   id: number;
@@ -186,6 +187,10 @@ export function ManageStudents() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <BackButton fallbackPath="/teacher" />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
