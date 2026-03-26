@@ -7,6 +7,8 @@ import {
   ClipboardList, 
   Calendar,
   FileText,
+  Award,
+  PenTool,
   Menu,
   X,
   GraduationCap,
@@ -22,6 +24,8 @@ const navItems = [
   { icon: Calendar, label: "Attendance", path: "/teacher/attendance" },
   { icon: ClipboardList, label: "Assignments", path: "/teacher/assignments" },
   { icon: FileText, label: "Resources", path: "/teacher/resources" },
+  { icon: Award, label: "Marks", path: "/teacher/marks" },
+  { icon: PenTool, label: "Whiteboard", path: "/teacher/whiteboard" },
 ];
 
 export function TeacherLayout() {

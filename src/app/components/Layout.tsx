@@ -11,7 +11,6 @@ import {
   User, 
   Award, 
   CalendarDays,
-  PenTool,
   UtensilsCrossed,
   GraduationCap,
   Menu,
@@ -41,7 +40,6 @@ const navItems = [
   { icon: MessageSquare, label: "Feedback", path: "/student/feedback" },
   { icon: Award, label: "Marks", path: "/student/marks" },
   { icon: CalendarDays, label: "Calendar", path: "/student/calendar" },
-  { icon: PenTool, label: "Whiteboard", path: "/student/whiteboard" },
   { icon: UtensilsCrossed, label: "Canteen", path: "/student/canteen" },
   { icon: User, label: "My Profile", path: "/student/profile" },
 ];

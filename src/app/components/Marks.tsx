@@ -9,13 +9,16 @@ import { supabase } from "../lib/supabase";
 
 type SemesterMark = {
   subject: string;
-  internal1: number;
-  internal2: number;
-  internal3: number;
+  internals: number;
+  ca1: number;
+  mid_sem: number;
+  ca2: number;
   assignment: number;
+  end_sem: number;
   total: number;
   maxMarks: number;
   grade: string;
+  cgpa: number | null;
 };
 
 type PreviousSemester = {
@@ -69,7 +72,7 @@ export function Marks() {
 
       const { data: marksRows } = await supabase
         .from("student_marks")
-        .select("subject, internal1, internal2, internal3, assignment, total, max_marks, grade, semester")
+        .select("subject, internals, ca1, mid_sem, ca2, assignment, end_sem, total, max_marks, grade, cgpa, semester")
         .eq("student_user_id", studentRow.id)
         .order("semester", { ascending: false });
 
@@ -86,13 +89,16 @@ export function Marks() {
         .filter((row: any) => Number(row.semester || 1) === latestSemester)
         .map((row: any) => ({
           subject: row.subject,
-          internal1: Number(row.internal1 || 0),
-          internal2: Number(row.internal2 || 0),
-          internal3: Number(row.internal3 || 0),
+          internals: Number(row.internals || 0),
+          ca1: Number(row.ca1 || 0),
+          mid_sem: Number(row.mid_sem || 0),
+          ca2: Number(row.ca2 || 0),
           assignment: Number(row.assignment || 0),
+          end_sem: Number(row.end_sem || 0),
           total: Number(row.total || 0),
           maxMarks: Number(row.max_marks || 100),
           grade: row.grade || "NA",
+          cgpa: row.cgpa ? Number(row.cgpa) : null,
         }));
 
       const semesterMap = new Map<number, { totalMarks: number; maxMarks: number; subjects: number }>();
@@ -234,12 +240,14 @@ export function Marks() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Subject</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Internal 1</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Internal 2</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Internal 3</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Internals</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">CA-1</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Mid-Sem</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">CA-2</th>
                     <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Assignment</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">End-Sem</th>
                     <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Total</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Grade</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">CGPA</th>
                     <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Progress</th>
                   </tr>
                 </thead>
@@ -263,21 +271,17 @@ export function Marks() {
                     return (
                       <tr key={idx} className="border-b border-border hover:bg-secondary/50 transition-colors">
                         <td className="py-4 px-4 font-medium text-foreground">{subject.subject}</td>
-                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.internal1}/25</td>
-                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.internal2}/25</td>
-                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.internal3}/25</td>
-                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.assignment}/10</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.internals.toFixed(1)}/5</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.ca1.toFixed(1)}/10</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.mid_sem.toFixed(1)}/20</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.ca2.toFixed(1)}/10</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.assignment.toFixed(1)}/5</td>
+                        <td className="py-4 px-4 text-center text-muted-foreground">{subject.end_sem.toFixed(1)}/50</td>
                         <td className="py-4 px-4 text-center font-semibold text-foreground">
                           {subject.total}/{subject.maxMarks}
                         </td>
-                        <td className="py-4 px-4 text-center">
-                          <span
-                            className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${getGradeColor(
-                              subject.grade
-                            )} text-white font-semibold`}
-                          >
-                            {subject.grade}
-                          </span>
+                        <td className="py-4 px-4 text-center font-semibold text-foreground">
+                          {subject.cgpa !== null ? subject.cgpa.toFixed(1) : "--"}/10
                         </td>
                         <td className="py-4 px-4">
                           <div className="w-24">

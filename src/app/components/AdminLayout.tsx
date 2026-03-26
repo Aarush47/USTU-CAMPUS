@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router";
 import { UserButton } from "@clerk/clerk-react";
-import { LayoutDashboard, UserPlus, Menu, X, Shield } from "lucide-react";
+import { LayoutDashboard, UserPlus, Menu, X, Shield, ScrollText } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
   { icon: UserPlus, label: "Manage Accounts", path: "/admin/accounts" },
+  { icon: ScrollText, label: "Audit Logs", path: "/admin/audit" },
 ];
 
 export function AdminLayout() {

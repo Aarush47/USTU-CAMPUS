@@ -25,9 +25,11 @@ import { TeacherAttendance } from "./pages/teacher/TeacherAttendance";
 import { TeacherAssignments } from "./pages/teacher/TeacherAssignments";
 import { TeacherResources } from "./pages/teacher/TeacherResources";
 import { ManageStudents } from "./pages/teacher/ManageStudents";
+import { TeacherMarks } from "./pages/teacher/TeacherMarks";
 import { AdminProtectedLayout } from "./components/AdminProtectedLayout";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminAccounts } from "./pages/admin/AdminAccounts";
+import { AdminAuditLogs } from "./pages/admin/AdminAuditLogs";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
@@ -49,7 +51,6 @@ export const router = createBrowserRouter([
       { path: "profile", Component: MyProfile },
       { path: "marks", Component: Marks },
       { path: "calendar", Component: CalendarView },
-      { path: "whiteboard", Component: Whiteboard },
       { path: "canteen", Component: Canteen },
     ],
   },
@@ -62,6 +63,8 @@ export const router = createBrowserRouter([
       { path: "attendance", Component: TeacherAttendance },
       { path: "assignments", Component: TeacherAssignments },
       { path: "resources", Component: TeacherResources },
+      { path: "marks", Component: TeacherMarks },
+      { path: "whiteboard", Component: Whiteboard },
       { path: "students", Component: ManageStudents },
     ],
   },
@@ -71,6 +74,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: AdminDashboard },
       { path: "accounts", Component: AdminAccounts },
+      { path: "audit", Component: AdminAuditLogs },
     ],
   },
 ]);

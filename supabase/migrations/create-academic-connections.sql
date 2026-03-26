@@ -166,13 +166,16 @@ create table if not exists public.student_marks (
   class_id bigint references public.classes(id) on delete set null,
   subject text not null,
   semester int not null default 1,
-  internal1 numeric not null default 0,
-  internal2 numeric not null default 0,
-  internal3 numeric not null default 0,
+  internals numeric not null default 0,
+  ca1 numeric not null default 0,
+  mid_sem numeric not null default 0,
+  ca2 numeric not null default 0,
   assignment numeric not null default 0,
+  end_sem numeric not null default 0,
   total numeric not null default 0,
   max_marks numeric not null default 100,
   grade text not null default 'NA',
+  cgpa numeric,
   created_by_teacher_id bigint references public.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -198,8 +201,42 @@ begin
   end if;
 end $$;
 
+-- Add new assessment columns if they don't exist.
+alter table public.student_marks
+  add column if not exists internals numeric not null default 0,
+  add column if not exists ca1 numeric not null default 0,
+  add column if not exists mid_sem numeric not null default 0,
+  add column if not exists ca2 numeric not null default 0,
+  add column if not exists end_sem numeric not null default 0,
+  add column if not exists cgpa numeric;
+
+-- If table existed with old internal1/internal2/internal3 columns, consolidate them.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'student_marks'
+      and column_name = 'internal1'
+  ) then
+    -- Sum internal1, internal2, internal3 into internals (if they exist)
+    update public.student_marks
+    set internals = coalesce(internal1, 0) + coalesce(internal2, 0) + coalesce(internal3, 0)
+    where internals = 0 and (internal1 is not null or internal2 is not null or internal3 is not null);
+    
+    -- Drop old internal columns
+    alter table public.student_marks
+      drop column if exists internal1,
+      drop column if exists internal2,
+      drop column if exists internal3;
+  end if;
+end $$;
+
 create index if not exists idx_student_marks_student_user_id on public.student_marks(student_user_id);
 create index if not exists idx_student_marks_semester on public.student_marks(semester desc);
+create unique index if not exists idx_student_marks_unique_subject_semester
+on public.student_marks(student_user_id, class_id, subject, semester);
 
 alter table public.class_enrollments enable row level security;
 alter table public.attendance_records enable row level security;
