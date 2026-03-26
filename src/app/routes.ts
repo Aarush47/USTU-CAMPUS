@@ -14,6 +14,7 @@ import { Whiteboard } from "./components/Whiteboard";
 import { Canteen } from "./components/Canteen";
 import { SignInPage } from "./pages/SignInPage";
 import { UpdatedSignUpPage } from "./pages/UpdatedSignUpPage";
+import { LandingPage } from "./pages/LandingPage";
 import { ProtectedLayout } from "./components/ProtectedLayout";
 import { TeacherProtectedLayout } from "./components/TeacherProtectedLayout";
 import { TeacherDashboard } from "./pages/teacher/TeacherDashboard";
@@ -27,10 +28,11 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminAccounts } from "./pages/admin/AdminAccounts";
 
 export const router = createBrowserRouter([
+  { path: "/", Component: LandingPage },
   { path: "/sign-in", Component: SignInPage },
   { path: "/sign-up", Component: UpdatedSignUpPage },
   {
-    path: "/",
+    path: "/student",
     Component: ProtectedLayout,
     children: [
       { index: true, Component: Dashboard },

@@ -28,18 +28,18 @@ type StudentProfile = {
 };
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Bell, label: "Notice Board", path: "/notices" },
-  { icon: Calendar, label: "Timetable", path: "/timetable" },
-  { icon: BookOpen, label: "Library", path: "/library" },
-  { icon: UserCheck, label: "Attendance", path: "/attendance" },
-  { icon: DollarSign, label: "Fees", path: "/fees" },
-  { icon: MessageSquare, label: "Feedback", path: "/feedback" },
-  { icon: Award, label: "Marks", path: "/marks" },
-  { icon: CalendarDays, label: "Calendar", path: "/calendar" },
-  { icon: PenTool, label: "Whiteboard", path: "/whiteboard" },
-  { icon: UtensilsCrossed, label: "Canteen", path: "/canteen" },
-  { icon: User, label: "My Profile", path: "/profile" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/student" },
+  { icon: Bell, label: "Notice Board", path: "/student/notices" },
+  { icon: Calendar, label: "Timetable", path: "/student/timetable" },
+  { icon: BookOpen, label: "Library", path: "/student/library" },
+  { icon: UserCheck, label: "Attendance", path: "/student/attendance" },
+  { icon: DollarSign, label: "Fees", path: "/student/fees" },
+  { icon: MessageSquare, label: "Feedback", path: "/student/feedback" },
+  { icon: Award, label: "Marks", path: "/student/marks" },
+  { icon: CalendarDays, label: "Calendar", path: "/student/calendar" },
+  { icon: PenTool, label: "Whiteboard", path: "/student/whiteboard" },
+  { icon: UtensilsCrossed, label: "Canteen", path: "/student/canteen" },
+  { icon: User, label: "My Profile", path: "/student/profile" },
 ];
 
 export function Layout() {

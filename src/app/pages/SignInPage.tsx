@@ -12,7 +12,7 @@ export function SignInPage() {
               card: "bg-card border border-border rounded-lg",
             },
           }}
-          redirectUrl="/"
+          redirectUrl="/student"
         />
       </div>
     </div>
