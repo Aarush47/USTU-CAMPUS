@@ -2,7 +2,10 @@ import { Card } from "./ui/card";
 import { Award, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { useUser } from "@clerk/clerk-react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase";
 
 type SemesterMark = {
   subject: string;
@@ -31,19 +34,111 @@ const getGradeColor = (grade: string) => {
 };
 
 export function Marks() {
-  const { data: semesterMarks } = useSupabaseTable<SemesterMark>(["semester_marks", "marks"], {
+  const { user } = useUser();
+  const [studentMarksRows, setStudentMarksRows] = useState<SemesterMark[]>([]);
+  const [studentSemesters, setStudentSemesters] = useState<PreviousSemester[]>([]);
+  const [loadingConnectedMarks, setLoadingConnectedMarks] = useState(true);
+
+  const { data: legacySemesterMarks } = useSupabaseTable<SemesterMark>(["semester_marks", "marks"], {
     fallbackData: [],
   });
 
-  const { data: previousSemesters } = useSupabaseTable<PreviousSemester>(["previous_semesters", "semesters"], {
+  const { data: legacyPreviousSemesters } = useSupabaseTable<PreviousSemester>(["previous_semesters", "semesters"], {
     fallbackData: [],
     orderBy: { column: "semester", ascending: false },
   });
 
+  useEffect(() => {
+    const fetchConnectedMarks = async () => {
+      if (!user?.id) return;
+
+      setLoadingConnectedMarks(true);
+
+      const { data: studentRow } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_user_id", user.id)
+        .maybeSingle();
+
+      if (!studentRow?.id) {
+        setStudentMarksRows([]);
+        setStudentSemesters([]);
+        setLoadingConnectedMarks(false);
+        return;
+      }
+
+      const { data: marksRows } = await supabase
+        .from("student_marks")
+        .select("subject, internal1, internal2, internal3, assignment, total, max_marks, grade, semester")
+        .eq("student_user_id", studentRow.id)
+        .order("semester", { ascending: false });
+
+      if (!marksRows || marksRows.length === 0) {
+        setStudentMarksRows([]);
+        setStudentSemesters([]);
+        setLoadingConnectedMarks(false);
+        return;
+      }
+
+      const latestSemester = Math.max(...marksRows.map((row: any) => Number(row.semester || 1)));
+
+      const mappedCurrentSemester = marksRows
+        .filter((row: any) => Number(row.semester || 1) === latestSemester)
+        .map((row: any) => ({
+          subject: row.subject,
+          internal1: Number(row.internal1 || 0),
+          internal2: Number(row.internal2 || 0),
+          internal3: Number(row.internal3 || 0),
+          assignment: Number(row.assignment || 0),
+          total: Number(row.total || 0),
+          maxMarks: Number(row.max_marks || 100),
+          grade: row.grade || "NA",
+        }));
+
+      const semesterMap = new Map<number, { totalMarks: number; maxMarks: number; subjects: number }>();
+
+      marksRows.forEach((row: any) => {
+        const semester = Number(row.semester || 1);
+        const existing = semesterMap.get(semester) ?? { totalMarks: 0, maxMarks: 0, subjects: 0 };
+        existing.totalMarks += Number(row.total || 0);
+        existing.maxMarks += Number(row.max_marks || 100);
+        existing.subjects += 1;
+        semesterMap.set(semester, existing);
+      });
+
+      const mappedSemesters: PreviousSemester[] = Array.from(semesterMap.entries())
+        .map(([semester, values]) => ({
+          semester,
+          sgpa: Number(((values.totalMarks / Math.max(values.maxMarks, 1)) * 10).toFixed(2)),
+          subjects: values.subjects,
+          totalMarks: values.totalMarks,
+          maxMarks: values.maxMarks,
+        }))
+        .sort((a, b) => b.semester - a.semester);
+
+      setStudentMarksRows(mappedCurrentSemester);
+      setStudentSemesters(mappedSemesters);
+      setLoadingConnectedMarks(false);
+    };
+
+    void fetchConnectedMarks();
+  }, [user?.id]);
+
+  const semesterMarks = studentMarksRows.length > 0 ? studentMarksRows : legacySemesterMarks;
+  const previousSemesters = studentSemesters.length > 0 ? studentSemesters : legacyPreviousSemesters;
+
   const currentSemesterTotal = semesterMarks.reduce((sum, subject) => sum + subject.total, 0);
   const currentSemesterMax = semesterMarks.reduce((sum, subject) => sum + subject.maxMarks, 0);
   const currentPercentage = currentSemesterMax ? (currentSemesterTotal / currentSemesterMax) * 100 : 0;
-  const currentCGPA = 8.6;
+  const currentCGPA = useMemo(() => {
+    if (previousSemesters.length === 0) return 0;
+    return Number(
+      (
+        previousSemesters.reduce((sum, semester) => sum + semester.sgpa, 0) /
+        previousSemesters.length
+      ).toFixed(2)
+    );
+  }, [previousSemesters]);
 
   return (
     <div className="p-6 space-y-6">
@@ -75,7 +170,9 @@ export function Marks() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Current Semester</p>
-              <h3 className="text-3xl font-semibold text-foreground mt-2">8.9</h3>
+              <h3 className="text-3xl font-semibold text-foreground mt-2">
+                {previousSemesters[0]?.sgpa?.toFixed(2) ?? "--"}
+              </h3>
               <p className="text-sm text-muted-foreground mt-1">SGPA (Predicted)</p>
             </div>
             <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -147,6 +244,20 @@ export function Marks() {
                   </tr>
                 </thead>
                 <tbody>
+                  {loadingConnectedMarks && semesterMarks.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-6 text-center text-muted-foreground">
+                        Loading marks...
+                      </td>
+                    </tr>
+                  )}
+                  {!loadingConnectedMarks && semesterMarks.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-6 text-center text-muted-foreground">
+                        No marks have been published yet.
+                      </td>
+                    </tr>
+                  )}
                   {semesterMarks.map((subject, idx) => {
                     const percentage = (subject.total / subject.maxMarks) * 100;
                     return (

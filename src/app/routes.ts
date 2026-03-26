@@ -12,6 +12,8 @@ import { Marks } from "./components/Marks";
 import { CalendarView } from "./components/CalendarView";
 import { Whiteboard } from "./components/Whiteboard";
 import { Canteen } from "./components/Canteen";
+import { StudentAssignments } from "./components/StudentAssignments";
+import { StudentResources } from "./components/StudentResources";
 import { SignInPage } from "./pages/SignInPage";
 import { UpdatedSignUpPage } from "./pages/UpdatedSignUpPage";
 import { LandingPage } from "./pages/LandingPage";
@@ -40,6 +42,8 @@ export const router = createBrowserRouter([
       { path: "timetable", Component: Timetable },
       { path: "library", Component: Library },
       { path: "attendance", Component: Attendance },
+      { path: "assignments", Component: StudentAssignments },
+      { path: "resources", Component: StudentResources },
       { path: "fees", Component: Fees },
       { path: "feedback", Component: Feedback },
       { path: "profile", Component: MyProfile },

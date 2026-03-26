@@ -20,8 +20,11 @@ export function TeacherClasses() {
   const [teacherId, setTeacherId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [selectedClassForEnroll, setSelectedClassForEnroll] = useState<number | null>(null);
+  const [studentEmail, setStudentEmail] = useState("");
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -40,9 +43,24 @@ export function TeacherClasses() {
       return;
     }
 
+    const classIds = (data || []).map((item) => item.id);
+    const enrollmentCountByClass = new Map<number, number>();
+
+    if (classIds.length > 0) {
+      const { data: enrollmentRows } = await supabase
+        .from("class_enrollments")
+        .select("class_id")
+        .in("class_id", classIds);
+
+      (enrollmentRows || []).forEach((row: any) => {
+        const current = enrollmentCountByClass.get(row.class_id) ?? 0;
+        enrollmentCountByClass.set(row.class_id, current + 1);
+      });
+    }
+
     const normalized: Class[] = (data || []).map((item) => ({
       ...item,
-      students: 0,
+      students: enrollmentCountByClass.get(item.id) ?? 0,
     }));
 
     setClasses(normalized);
@@ -127,6 +145,65 @@ export function TeacherClasses() {
     setSuccess("Class deleted successfully");
   };
 
+  const handleEnrollStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!selectedClassForEnroll) {
+      setError("Select a class to enroll a student.");
+      return;
+    }
+
+    if (!studentEmail.endsWith("@ustu.edu.in")) {
+      setError("Student email must be in @ustu.edu.in domain.");
+      return;
+    }
+
+    setIsEnrolling(true);
+
+    const { data: studentRow, error: studentError } = await supabase
+      .from("users")
+      .select("id, role, is_active")
+      .eq("email", studentEmail.toLowerCase())
+      .maybeSingle();
+
+    if (studentError || !studentRow?.id) {
+      setIsEnrolling(false);
+      setError("Student account not found. Ask the student to complete signup first.");
+      return;
+    }
+
+    if (studentRow.role !== "student" || !studentRow.is_active) {
+      setIsEnrolling(false);
+      setError("Only active student accounts can be enrolled.");
+      return;
+    }
+
+    const { error: enrollError } = await supabase.from("class_enrollments").insert({
+      class_id: selectedClassForEnroll,
+      student_user_id: studentRow.id,
+    });
+
+    setIsEnrolling(false);
+
+    if (enrollError) {
+      if (enrollError.message.toLowerCase().includes("duplicate")) {
+        setError("Student is already enrolled in this class.");
+      } else {
+        setError(enrollError.message);
+      }
+      return;
+    }
+
+    if (teacherId) {
+      await fetchClasses(teacherId);
+    }
+    setStudentEmail("");
+    setSelectedClassForEnroll(null);
+    setSuccess("Student enrolled successfully.");
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-4">
@@ -209,6 +286,40 @@ export function TeacherClasses() {
 
       {error && <p className="text-sm text-destructive mb-4">{error}</p>}
       {success && <p className="text-sm text-green-600 mb-4">{success}</p>}
+
+      <div className="bg-card border border-border rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-bold text-foreground mb-4">Enroll Student Into Class</h2>
+        <form onSubmit={handleEnrollStudent} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <select
+            value={selectedClassForEnroll ?? ""}
+            onChange={(e) => setSelectedClassForEnroll(Number(e.target.value))}
+            className="px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
+            required
+          >
+            <option value="">Choose class...</option>
+            {classes.map((cls) => (
+              <option key={cls.id} value={cls.id}>
+                {cls.name} - {cls.subject}
+              </option>
+            ))}
+          </select>
+          <input
+            type="email"
+            value={studentEmail}
+            onChange={(e) => setStudentEmail(e.target.value.trim())}
+            placeholder="student@ustu.edu.in"
+            className="px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
+            required
+          />
+          <button
+            type="submit"
+            disabled={isEnrolling}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            {isEnrolling ? "Enrolling..." : "Enroll Student"}
+          </button>
+        </form>
+      </div>
 
       {/* Classes Grid */}
       {loading ? (

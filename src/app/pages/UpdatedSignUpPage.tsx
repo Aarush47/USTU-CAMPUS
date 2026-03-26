@@ -112,7 +112,7 @@ export function UpdatedSignUpPage() {
     // Enforce admin pre-registration for both teacher and student accounts.
     const { data: preRegisteredUser, error: preRegError } = await supabase
       .from("users")
-      .select("role")
+      .select("role, is_active")
       .eq("email", email)
       .maybeSingle();
 
@@ -123,6 +123,11 @@ export function UpdatedSignUpPage() {
 
     if (!preRegisteredUser) {
       setError("❌ This email is not authorized by administration yet");
+      return;
+    }
+
+    if (!preRegisteredUser.is_active) {
+      setError("❌ This account is deactivated by administration");
       return;
     }
 

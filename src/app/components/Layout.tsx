@@ -15,7 +15,9 @@ import {
   UtensilsCrossed,
   GraduationCap,
   Menu,
-  X
+  X,
+  ClipboardList,
+  FolderOpen
 } from "lucide-react";
 import { useState } from "react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
@@ -33,6 +35,8 @@ const navItems = [
   { icon: Calendar, label: "Timetable", path: "/student/timetable" },
   { icon: BookOpen, label: "Library", path: "/student/library" },
   { icon: UserCheck, label: "Attendance", path: "/student/attendance" },
+  { icon: ClipboardList, label: "Assignments", path: "/student/assignments" },
+  { icon: FolderOpen, label: "Resources", path: "/student/resources" },
   { icon: DollarSign, label: "Fees", path: "/student/fees" },
   { icon: MessageSquare, label: "Feedback", path: "/student/feedback" },
   { icon: Award, label: "Marks", path: "/student/marks" },

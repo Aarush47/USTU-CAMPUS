@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useUser } from "@clerk/clerk-react";
 import { 
   BookOpen, 
   UserCheck, 
@@ -35,42 +36,27 @@ type EventItem = {
   type: "deadline" | "event" | "exam";
 };
 
-const stats = [
-  {
-    icon: UserCheck,
-    label: "Attendance",
-    value: "92%",
-    change: "+2%",
-    color: "bg-emerald-500",
-    link: "/attendance"
-  },
-  {
-    icon: Award,
-    label: "Average Grade",
-    value: "8.5",
-    change: "+0.3",
-    color: "bg-primary",
-    link: "/marks"
-  },
-  {
-    icon: BookOpen,
-    label: "Books Issued",
-    value: "3",
-    change: "Active",
-    color: "bg-purple-500",
-    link: "/library"
-  },
-  {
-    icon: DollarSign,
-    label: "Pending Fees",
-    value: "₹0",
-    change: "Paid",
-    color: "bg-cyan-500",
-    link: "/fees"
-  },
-];
+type AttendanceBySubject = {
+  percentage: number;
+};
+
+type MarksRow = {
+  total: number;
+  maxMarks: number;
+};
+
+type IssuedBookRow = {
+  status?: string;
+};
+
+type FeeRow = {
+  status: string;
+  amount: number;
+};
 
 export function Dashboard() {
+  const { user } = useUser();
+
   const {
     data: recentNotices,
     loading: noticesLoading,
@@ -97,11 +83,95 @@ export function Dashboard() {
     limit: 4,
   });
 
+  const { data: attendanceRows } = useSupabaseTable<AttendanceBySubject>(
+    ["attendance_by_subject"],
+    { fallbackData: [] }
+  );
+
+  const { data: marksRows } = useSupabaseTable<MarksRow>(["semester_marks"], {
+    fallbackData: [],
+  });
+
+  const { data: issuedBooks } = useSupabaseTable<IssuedBookRow>(["issued_books"], {
+    fallbackData: [],
+  });
+
+  const { data: feeRows } = useSupabaseTable<FeeRow>(["fee_structure"], {
+    fallbackData: [],
+  });
+
+  const { data: profiles } = useSupabaseTable<{ name?: string }>(["student_profile"], {
+    fallbackData: [],
+  });
+
+  const attendanceAvg =
+    attendanceRows.length > 0
+      ? Math.round(
+          attendanceRows.reduce((sum, row) => sum + Number(row.percentage || 0), 0) /
+            attendanceRows.length
+        )
+      : null;
+
+  const marksAvg =
+    marksRows.length > 0
+      ? (
+          marksRows.reduce((sum, row) => sum + Number(row.total || 0), 0) /
+          marksRows.length
+        ).toFixed(1)
+      : null;
+
+  const activeBooks = issuedBooks.filter((book) => book.status !== "Returned").length;
+
+  const pendingFees = feeRows
+    .filter((fee) => fee.status.toLowerCase() !== "paid")
+    .reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+
+  const displayName =
+    profiles[0]?.name ||
+    user?.firstName ||
+    user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+    "Student";
+
+  const stats = [
+    {
+      icon: UserCheck,
+      label: "Attendance",
+      value: attendanceAvg !== null ? `${attendanceAvg}%` : "--",
+      change: attendanceRows.length > 0 ? "Live" : "No data",
+      color: "bg-emerald-500",
+      link: "/student/attendance",
+    },
+    {
+      icon: Award,
+      label: "Average Marks",
+      value: marksAvg !== null ? marksAvg : "--",
+      change: marksRows.length > 0 ? "Live" : "No data",
+      color: "bg-primary",
+      link: "/student/marks",
+    },
+    {
+      icon: BookOpen,
+      label: "Books Issued",
+      value: String(activeBooks),
+      change: issuedBooks.length > 0 ? "Live" : "No data",
+      color: "bg-purple-500",
+      link: "/student/library",
+    },
+    {
+      icon: DollarSign,
+      label: "Pending Fees",
+      value: `₹${pendingFees}`,
+      change: pendingFees > 0 ? "Pending" : "Paid",
+      color: "bg-cyan-500",
+      link: "/student/fees",
+    },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold text-foreground mb-2">Welcome back, Arjun! 👋</h1>
+        <h1 className="text-3xl font-semibold text-foreground mb-2">Welcome back, {displayName}! 👋</h1>
         <p className="text-muted-foreground">Here's what's happening with your academics today.</p>
       </div>
 
@@ -139,7 +209,7 @@ export function Dashboard() {
               <Calendar className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-semibold">Today's Classes</h2>
             </div>
-            <Link to="/timetable" className="text-sm text-primary hover:underline">
+            <Link to="/student/timetable" className="text-sm text-primary hover:underline">
               View Full Schedule
             </Link>
           </div>
@@ -169,6 +239,9 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
+            {!classesLoading && todaysClasses.length === 0 && (
+              <p className="text-sm text-muted-foreground">No classes scheduled yet.</p>
+            )}
           </div>
         </Card>
 
@@ -200,6 +273,9 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
+            {!eventsLoading && upcomingEvents.length === 0 && (
+              <p className="text-sm text-muted-foreground">No upcoming events.</p>
+            )}
           </div>
         </Card>
       </div>
@@ -211,7 +287,7 @@ export function Dashboard() {
             <Bell className="w-5 h-5 text-primary" />
             <h2 className="text-xl font-semibold">Recent Notices</h2>
           </div>
-          <Link to="/notices" className="text-sm text-primary hover:underline">
+          <Link to="/student/notices" className="text-sm text-primary hover:underline">
             View All
           </Link>
         </div>
@@ -239,6 +315,9 @@ export function Dashboard() {
               </span>
             </div>
           ))}
+          {!noticesLoading && recentNotices.length === 0 && (
+            <p className="text-sm text-muted-foreground">No notices available right now.</p>
+          )}
         </div>
       </Card>
     </div>

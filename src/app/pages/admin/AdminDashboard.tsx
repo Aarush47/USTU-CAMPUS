@@ -5,20 +5,23 @@ import { BackButton } from "../../components/BackButton";
 type UserRow = {
   id: number;
   role: "admin" | "teacher" | "student";
+  is_active: boolean;
 };
 
 export function AdminDashboard() {
   const { data: users = [] } = useSupabaseTable<UserRow>("users", { fallbackData: [] });
 
-  const adminCount = users.filter((u) => u.role === "admin").length;
-  const teacherCount = users.filter((u) => u.role === "teacher").length;
-  const studentCount = users.filter((u) => u.role === "student").length;
+  const activeUsers = users.filter((u) => u.is_active);
+
+  const adminCount = activeUsers.filter((u) => u.role === "admin").length;
+  const teacherCount = activeUsers.filter((u) => u.role === "teacher").length;
+  const studentCount = activeUsers.filter((u) => u.role === "student").length;
 
   const cards = [
     { label: "Admins", value: adminCount, icon: Shield, color: "bg-slate-700" },
     { label: "Teachers", value: teacherCount, icon: UserCheck, color: "bg-blue-600" },
     { label: "Students", value: studentCount, icon: GraduationCap, color: "bg-green-600" },
-    { label: "Total Accounts", value: users.length, icon: Users, color: "bg-purple-600" },
+    { label: "Total Active", value: activeUsers.length, icon: Users, color: "bg-purple-600" },
   ];
 
   return (

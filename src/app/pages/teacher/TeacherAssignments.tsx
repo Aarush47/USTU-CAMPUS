@@ -1,35 +1,179 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Edit2, Trash2, Eye } from "lucide-react";
+import { useUser } from "@clerk/clerk-react";
+import { supabase } from "../../lib/supabase";
 import { BackButton } from "../../components/BackButton";
 
 type Assignment = {
   id: number;
   title: string;
-  class: string;
+  className: string;
   dueDate: string;
   submissions: number;
   total: number;
+  classId: number;
+};
+
+type ClassItem = {
+  id: number;
+  name: string;
+  subject: string;
 };
 
 export function TeacherAssignments() {
+  const { user } = useUser();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
-    class: "",
+    classId: "",
     description: "",
     dueDate: "",
   });
+  const [teacherId, setTeacherId] = useState<number | null>(null);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const assignments: Assignment[] = [
-    // Placeholder
-  ];
+  const fetchAssignments = async (resolvedTeacherId: number, resolvedClasses: ClassItem[]) => {
+    const { data: rows, error: assignmentError } = await supabase
+      .from("assignments")
+      .select("id, title, class_id, due_date")
+      .eq("created_by_teacher_id", resolvedTeacherId)
+      .order("created_at", { ascending: false });
+
+    if (assignmentError) {
+      setError(assignmentError.message);
+      setAssignments([]);
+      return;
+    }
+
+    const classIds = resolvedClasses.map((item) => item.id);
+    const enrollmentCountByClass = new Map<number, number>();
+
+    if (classIds.length > 0) {
+      const { data: enrollments } = await supabase
+        .from("class_enrollments")
+        .select("class_id")
+        .in("class_id", classIds);
+
+      (enrollments ?? []).forEach((row: any) => {
+        const current = enrollmentCountByClass.get(row.class_id) ?? 0;
+        enrollmentCountByClass.set(row.class_id, current + 1);
+      });
+    }
+
+    const mapped: Assignment[] = (rows ?? []).map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      classId: row.class_id,
+      className:
+        resolvedClasses.find((classRow) => classRow.id === row.class_id)?.name ||
+        "Unknown Class",
+      dueDate: row.due_date,
+      submissions: 0,
+      total: enrollmentCountByClass.get(row.class_id) ?? 0,
+    }));
+
+    setAssignments(mapped);
+  };
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      if (!user?.id) return;
+
+      setLoading(true);
+      setError("");
+
+      const { data: teacher, error: teacherError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_user_id", user.id)
+        .maybeSingle();
+
+      if (teacherError || !teacher?.id) {
+        setError("Could not load teacher profile.");
+        setLoading(false);
+        return;
+      }
+
+      setTeacherId(teacher.id);
+
+      const { data: classRows, error: classError } = await supabase
+        .from("classes")
+        .select("id, name, subject")
+        .eq("teacher_id", teacher.id)
+        .order("created_at", { ascending: false });
+
+      if (classError) {
+        setError(classError.message);
+        setLoading(false);
+        return;
+      }
+
+      const normalizedClasses = (classRows ?? []) as ClassItem[];
+      setClasses(normalizedClasses);
+      await fetchAssignments(teacher.id, normalizedClasses);
+      setLoading(false);
+    };
+
+    void bootstrap();
+  }, [user?.id]);
 
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Save to Supabase
-    console.log("Creating assignment:", formData);
-    setFormData({ title: "", class: "", description: "", dueDate: "" });
+
+    setError("");
+    setSuccess("");
+
+    if (!teacherId) {
+      setError("Teacher profile missing.");
+      return;
+    }
+
+    setSaving(true);
+
+    const { error: createError } = await supabase.from("assignments").insert({
+      title: formData.title.trim(),
+      class_id: Number(formData.classId),
+      description: formData.description.trim() || null,
+      due_date: formData.dueDate,
+      created_by_teacher_id: teacherId,
+    });
+
+    setSaving(false);
+
+    if (createError) {
+      setError(createError.message);
+      return;
+    }
+
+    await fetchAssignments(teacherId, classes);
+    setFormData({ title: "", classId: "", description: "", dueDate: "" });
     setShowCreateForm(false);
+    setSuccess("Assignment created successfully.");
+  };
+
+  const handleDeleteAssignment = async (assignmentId: number) => {
+    setError("");
+    setSuccess("");
+
+    const { error: deleteError } = await supabase
+      .from("assignments")
+      .delete()
+      .eq("id", assignmentId);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    if (teacherId) {
+      await fetchAssignments(teacherId, classes);
+    }
+    setSuccess("Assignment deleted.");
   };
 
   return (
@@ -81,15 +225,19 @@ export function TeacherAssignments() {
                   Class
                 </label>
                 <select
-                  value={formData.class}
+                  value={formData.classId}
                   onChange={(e) =>
-                    setFormData({ ...formData, class: e.target.value })
+                    setFormData({ ...formData, classId: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
                   required
                 >
                   <option value="">Choose a class...</option>
-                  {/* Classes will be populated from DB */}
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name} - {cls.subject}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -134,14 +282,19 @@ export function TeacherAssignments() {
               </button>
               <button
                 type="submit"
+                disabled={saving}
                 className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                Create Assignment
+                {saving ? "Creating..." : "Create Assignment"}
               </button>
             </div>
           </form>
         </div>
       )}
+
+      {loading && <p className="text-sm text-muted-foreground mb-4">Loading assignments...</p>}
+      {error && <p className="text-sm text-destructive mb-4">{error}</p>}
+      {success && <p className="text-sm text-green-600 mb-4">{success}</p>}
 
       {/* Assignments List */}
       {assignments.length === 0 ? (
@@ -170,7 +323,7 @@ export function TeacherAssignments() {
                     {assignment.title}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {assignment.class} • Due: {assignment.dueDate}
+                    {assignment.className} • Due: {new Date(assignment.dueDate).toLocaleDateString("en-IN")}
                   </p>
                 </div>
                 <div className="text-right">
@@ -193,11 +346,17 @@ export function TeacherAssignments() {
                   <Eye className="w-4 h-4" />
                   View Submissions
                 </button>
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-foreground hover:bg-accent transition-colors text-sm">
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-foreground/50 transition-colors text-sm"
+                >
                   <Edit2 className="w-4 h-4" />
                   Edit
                 </button>
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-destructive hover:bg-destructive/10 transition-colors text-sm">
+                <button
+                  onClick={() => handleDeleteAssignment(assignment.id)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-destructive hover:bg-destructive/10 transition-colors text-sm"
+                >
                   <Trash2 className="w-4 h-4" />
                   Delete
                 </button>

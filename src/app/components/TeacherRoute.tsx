@@ -14,6 +14,7 @@ interface TeacherRouteProps {
 export function TeacherRoute({ children }: TeacherRouteProps) {
   const { isSignedIn, isLoaded, user } = useUser();
   const [isTeacher, setIsTeacher] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
@@ -38,19 +39,22 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
         // Prefer Clerk user ID lookup, fallback to email for legacy rows.
         const { data, error } = await supabase
           .from("users")
-          .select("role")
+          .select("role, is_active")
           .or(`clerk_user_id.eq.${user.id},email.eq.${user.emailAddresses[0].emailAddress}`)
           .single();
 
         if (error) {
           console.error("Error checking teacher role:", error);
           setIsTeacher(false);
+          setIsActive(false);
         } else {
           setIsTeacher(data?.role === "teacher" || data?.role === "admin");
+          setIsActive(Boolean(data?.is_active));
         }
       } catch (err) {
         console.error("Error:", err);
         setIsTeacher(false);
+        setIsActive(false);
       } finally {
         setIsChecking(false);
       }
@@ -72,6 +76,18 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
 
   if (!isSignedIn) {
     return <Navigate to="/sign-in" replace />;
+  }
+
+  if (!isActive) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Account Deactivated</h1>
+          <p className="text-muted-foreground mb-4">Your access has been disabled by administration.</p>
+          <a href="/sign-in" className="text-primary hover:underline">Back to Sign In</a>
+        </div>
+      </div>
+    );
   }
 
   if (!isTeacher) {

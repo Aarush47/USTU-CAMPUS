@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { UserCheck, QrCode, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import QRCode from "qrcode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { useUser } from "@clerk/clerk-react";
+import { supabase } from "../lib/supabase";
 
 type SubjectAttendance = {
   subject: string;
@@ -17,38 +18,100 @@ type SubjectAttendance = {
 type AttendanceRecord = {
   date: string;
   subject: string;
-  status: string;
+  status: "Present" | "Absent" | "Late";
   time: string;
 };
 
-type StudentProfile = {
-  name?: string;
-  roll_no?: string;
+type StudentIdentity = {
+  id: number;
+  name: string;
+  email: string;
 };
 
 export function Attendance() {
+  const { user } = useUser();
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQR, setShowQR] = useState(false);
+  const [studentIdentity, setStudentIdentity] = useState<StudentIdentity | null>(null);
+  const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const { data: profiles } = useSupabaseTable<StudentProfile>(["student_profile", "profile", "students"], {
-    fallbackData: [],
-  });
+  useEffect(() => {
+    const bootstrap = async () => {
+      if (!user?.id) return;
 
-  const { data: attendanceData } = useSupabaseTable<SubjectAttendance>([
-    "attendance_by_subject",
-    "attandance",
-  ], {
-    fallbackData: [],
-  });
+      setLoading(true);
+      setError("");
 
-  const { data: recentAttendance } = useSupabaseTable<AttendanceRecord>([
-    "attendance_records",
-    "attandance",
-  ], {
-    fallbackData: [],
-    orderBy: { column: "date", ascending: false },
-    limit: 20,
-  });
+      const { data: studentRow, error: studentError } = await supabase
+        .from("users")
+        .select("id, name, email")
+        .eq("clerk_user_id", user.id)
+        .maybeSingle();
+
+      if (studentError || !studentRow?.id) {
+        setError("Could not load your student profile.");
+        setLoading(false);
+        return;
+      }
+
+      setStudentIdentity({
+        id: studentRow.id,
+        name: studentRow.name || studentRow.email,
+        email: studentRow.email,
+      });
+
+      const { data: records, error: recordsError } = await supabase
+        .from("attendance_records")
+        .select("date, status, classes!inner(name, subject)")
+        .eq("student_user_id", studentRow.id)
+        .order("date", { ascending: false })
+        .limit(40);
+
+      if (recordsError) {
+        setError(recordsError.message);
+        setRecentAttendance([]);
+        setLoading(false);
+        return;
+      }
+
+      const mapped = (records ?? []).map((row: any) => ({
+        date: row.date,
+        subject: row.classes?.subject || row.classes?.name || "General",
+        status: row.status,
+        time: "-",
+      }));
+
+      setRecentAttendance(mapped);
+      setLoading(false);
+    };
+
+    void bootstrap();
+  }, [user?.id]);
+
+  const attendanceData = useMemo(() => {
+    const subjectMap = new Map<string, { present: number; total: number }>();
+
+    recentAttendance.forEach((record) => {
+      const existing = subjectMap.get(record.subject) ?? { present: 0, total: 0 };
+      existing.total += 1;
+      if (record.status === "Present") {
+        existing.present += 1;
+      }
+      subjectMap.set(record.subject, existing);
+    });
+
+    return Array.from(subjectMap.entries()).map(([subject, values]) => ({
+      subject,
+      present: values.present,
+      total: values.total,
+      percentage: values.total > 0 ? (values.present / values.total) * 100 : 0,
+    }));
+  }, [recentAttendance]);
+
+  const subjectsLoading = loading;
+  const recordsLoading = loading;
 
   const overallAttendance =
     ((attendanceData.reduce((sum, item) => sum + item.present, 0) /
@@ -56,10 +119,9 @@ export function Attendance() {
       100);
 
   const generateQRCode = async () => {
-    const studentProfile = profiles[0];
     const studentData = {
-      studentId: studentProfile?.roll_no ?? "-",
-      name: studentProfile?.name ?? "-",
+      studentId: studentIdentity?.id ?? "-",
+      name: studentIdentity?.name ?? "-",
       timestamp: new Date().toISOString(),
       location: "Room 301",
     };
@@ -174,7 +236,7 @@ export function Attendance() {
               {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />}
             </div>
             <div className="mt-6 space-y-2">
-              <p className="text-sm text-muted-foreground">Student ID: {profiles[0]?.roll_no ?? "-"}</p>
+              <p className="text-sm text-muted-foreground">Student ID: {studentIdentity?.id ?? "-"}</p>
               <p className="text-sm text-muted-foreground">Valid for: 30 seconds</p>
             </div>
             <Button onClick={() => setShowQR(false)} variant="outline" className="mt-4">
@@ -185,6 +247,8 @@ export function Attendance() {
       )}
 
       {/* Tabs */}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
       <Tabs defaultValue="subject" className="w-full">
         <TabsList className="grid w-full md:w-auto grid-cols-2 bg-secondary">
           <TabsTrigger value="subject">By Subject</TabsTrigger>
@@ -192,76 +256,92 @@ export function Attendance() {
         </TabsList>
 
         <TabsContent value="subject" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {attendanceData.map((subject) => (
-              <Card key={subject.subject} className="p-6 border border-border">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">{subject.subject}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {subject.present} / {subject.total} classes
+          {subjectsLoading ? (
+            <Card className="p-6 border border-border">
+              <p className="text-sm text-muted-foreground">Loading attendance by subject...</p>
+            </Card>
+          ) : attendanceData.length === 0 ? (
+            <Card className="p-6 border border-border">
+              <p className="text-sm text-muted-foreground">No attendance records yet.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {attendanceData.map((subject) => (
+                <Card key={subject.subject} className="p-6 border border-border">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">{subject.subject}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {subject.present} / {subject.total} classes
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span
+                        className={`text-2xl font-semibold ${
+                          subject.percentage >= 75 ? "text-emerald-600" : "text-red-600"
+                        }`}
+                      >
+                        {subject.percentage.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <Progress
+                    value={subject.percentage}
+                    className={subject.percentage >= 75 ? "[&>div]:bg-emerald-500" : "[&>div]:bg-red-500"}
+                  />
+                  {subject.percentage < 75 && (
+                    <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Below required 75% attendance
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className={`text-2xl font-semibold ${
-                        subject.percentage >= 75 ? "text-emerald-600" : "text-red-600"
-                      }`}
-                    >
-                      {subject.percentage.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-                <Progress
-                  value={subject.percentage}
-                  className={subject.percentage >= 75 ? "[&>div]:bg-emerald-500" : "[&>div]:bg-red-500"}
-                />
-                {subject.percentage < 75 && (
-                  <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Below required 75% attendance
-                  </p>
-                )}
-              </Card>
-            ))}
-          </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="recent" className="mt-6">
           <Card className="p-6 border border-border">
             <h2 className="text-lg font-semibold text-foreground mb-4">Recent Attendance Records</h2>
-            <div className="space-y-3">
-              {recentAttendance.map((record, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-4 bg-secondary rounded-lg border border-border"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    {getStatusIcon(record.status)}
-                    <div>
-                      <h4 className="font-medium text-foreground">{record.subject}</h4>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>{new Date(record.date).toLocaleDateString("en-IN")}</span>
-                        </div>
-                        {record.time !== "-" && (
+            {recordsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading recent records...</p>
+            ) : recentAttendance.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent attendance records.</p>
+            ) : (
+              <div className="space-y-3">
+                {recentAttendance.map((record, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-4 bg-secondary rounded-lg border border-border"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      {getStatusIcon(record.status)}
+                      <div>
+                        <h4 className="font-medium text-foreground">{record.subject}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{record.time}</span>
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{new Date(record.date).toLocaleDateString("en-IN")}</span>
                           </div>
-                        )}
+                          {record.time !== "-" && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>{record.time}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(record.status)}`}
+                    >
+                      {record.status}
+                    </span>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(record.status)}`}
-                  >
-                    {record.status}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

@@ -9,6 +9,7 @@ create table if not exists public.users (
   email text unique not null,
   name text,
   role text not null default 'student' check (role in ('student', 'teacher', 'admin')),
+  is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -17,6 +18,7 @@ create table if not exists public.users (
 create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_clerk_user_id on public.users(clerk_user_id);
 create index if not exists idx_users_role on public.users(role);
+create index if not exists idx_users_is_active on public.users(is_active);
 
 -- Enable RLS
 alter table public.users enable row level security;

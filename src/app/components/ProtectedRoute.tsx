@@ -14,6 +14,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isSignedIn, isLoaded, user } = useUser();
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -30,7 +31,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         const { data, error } = await supabase
           .from("users")
-          .select("role")
+          .select("role, is_active")
           .or(`clerk_user_id.eq.${user.id},email.eq.${email}`)
           .limit(1)
           .maybeSingle();
@@ -38,12 +39,15 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         if (error) {
           console.error("Access check failed:", error);
           setUserRole(null);
+          setIsActive(false);
         } else {
           setUserRole(data?.role ?? null);
+          setIsActive(Boolean(data?.is_active));
         }
       } catch (err) {
         console.error("Unexpected access check error:", err);
         setUserRole(null);
+        setIsActive(false);
       } finally {
         setIsCheckingAccess(false);
       }
@@ -74,6 +78,20 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (userRole === "teacher") {
     return <Navigate to="/teacher" replace />;
+  }
+
+  if (!isActive) {
+    return (
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Account Deactivated</h1>
+          <p className="text-muted-foreground mb-4">
+            Your account has been deactivated by administration. Contact admin for access.
+          </p>
+          <a href="/sign-in" className="text-primary hover:underline">Back to Sign In</a>
+        </div>
+      </div>
+    );
   }
 
   if (userRole !== "student") {
