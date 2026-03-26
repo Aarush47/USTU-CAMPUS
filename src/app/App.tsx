@@ -1,6 +1,7 @@
 import { ClerkProvider } from '@clerk/clerk-react';
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
+import { SessionEnforcer } from './components/SessionEnforcer';
 
 export default function App() {
   const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -11,6 +12,7 @@ export default function App() {
 
   return (
     <ClerkProvider publishableKey={publishableKey}>
+      <SessionEnforcer />
       <RouterProvider router={router} />
     </ClerkProvider>
   );
