@@ -35,8 +35,8 @@ create policy "public read student_profile" on public.student_profile for select
 
 drop policy if exists "users can update own profile" on public.student_profile;
 create policy "users can update own profile" on public.student_profile 
-  for update using (clerk_user_id = current_user_id()::text) 
-  with check (clerk_user_id = current_user_id()::text);
+  for update using (clerk_user_id = auth.uid()::text) 
+  with check (clerk_user_id = auth.uid()::text);
 
 drop policy if exists "public read academic_info" on public.academic_info;
 create policy "public read academic_info" on public.academic_info for select using (true);

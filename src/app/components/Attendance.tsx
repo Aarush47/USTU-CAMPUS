@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "./ui/card";
-import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
-import { UserCheck, QrCode, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import QRCode from "qrcode";
+import { UserCheck, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useUser } from "@clerk/clerk-react";
 import { supabase } from "../lib/supabase";
@@ -22,17 +20,8 @@ type AttendanceRecord = {
   time: string;
 };
 
-type StudentIdentity = {
-  id: number;
-  name: string;
-  email: string;
-};
-
 export function Attendance() {
   const { user } = useUser();
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const [showQR, setShowQR] = useState(false);
-  const [studentIdentity, setStudentIdentity] = useState<StudentIdentity | null>(null);
   const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -55,12 +44,6 @@ export function Attendance() {
         setLoading(false);
         return;
       }
-
-      setStudentIdentity({
-        id: studentRow.id,
-        name: studentRow.name || studentRow.email,
-        email: studentRow.email,
-      });
 
       const { data: records, error: recordsError } = await supabase
         .from("attendance_records")
@@ -118,35 +101,6 @@ export function Attendance() {
       Math.max(attendanceData.reduce((sum, item) => sum + item.total, 0), 1)) *
       100);
 
-  const generateQRCode = async () => {
-    const studentData = {
-      studentId: studentIdentity?.id ?? "-",
-      name: studentIdentity?.name ?? "-",
-      timestamp: new Date().toISOString(),
-      location: "Room 301",
-    };
-
-    try {
-      const url = await QRCode.toDataURL(JSON.stringify(studentData), {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: "#2563EB",
-          light: "#FFFFFF",
-        },
-      });
-      setQrCodeUrl(url);
-      setShowQR(true);
-
-      // Auto-hide after 30 seconds
-      setTimeout(() => {
-        setShowQR(false);
-      }, 30000);
-    } catch (err) {
-      console.error("Error generating QR code:", err);
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "Present":
@@ -182,7 +136,7 @@ export function Attendance() {
       </div>
 
       {/* Overall Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-6 border border-border">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -214,37 +168,7 @@ export function Attendance() {
             </div>
           </div>
         </Card>
-
-        <Card className="p-6 border border-primary bg-accent">
-          <div className="flex flex-col items-center justify-center h-full">
-            <QrCode className="w-12 h-12 text-primary mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">Quick Attendance</h3>
-            <Button onClick={generateQRCode} className="w-full">
-              Generate QR Code
-            </Button>
-          </div>
-        </Card>
       </div>
-
-      {/* QR Code Modal */}
-      {showQR && (
-        <Card className="p-8 border-2 border-primary bg-accent">
-          <div className="text-center">
-            <h3 className="text-xl font-semibold text-foreground mb-2">Scan to Mark Attendance</h3>
-            <p className="text-muted-foreground mb-6">Show this QR code to your professor</p>
-            <div className="inline-block p-4 bg-white rounded-lg shadow-lg">
-              {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />}
-            </div>
-            <div className="mt-6 space-y-2">
-              <p className="text-sm text-muted-foreground">Student ID: {studentIdentity?.id ?? "-"}</p>
-              <p className="text-sm text-muted-foreground">Valid for: 30 seconds</p>
-            </div>
-            <Button onClick={() => setShowQR(false)} variant="outline" className="mt-4">
-              Close
-            </Button>
-          </div>
-        </Card>
-      )}
 
       {/* Tabs */}
       {error && <p className="text-sm text-destructive">{error}</p>}

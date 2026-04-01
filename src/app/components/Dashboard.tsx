@@ -4,7 +4,6 @@ import { useUser } from "@clerk/clerk-react";
 import {
   BookOpen,
   UserCheck,
-  DollarSign,
   Award,
   Bell,
   Calendar,
@@ -51,7 +50,6 @@ export function Dashboard() {
   const [attendanceAvg, setAttendanceAvg] = useState<number | null>(null);
   const [marksAvg, setMarksAvg] = useState<number | null>(null);
   const [libraryCount, setLibraryCount] = useState(0);
-  const [pendingFees, setPendingFees] = useState(0);
 
   const currentTime = new Date().toTimeString().slice(0, 5);
 
@@ -119,7 +117,6 @@ export function Dashboard() {
         attendanceRes,
         marksRes,
         libraryRes,
-        feesRes,
       ] = await Promise.all([
         supabase
           .from("notices")
@@ -153,7 +150,6 @@ export function Dashboard() {
           .select("total, max_marks")
           .eq("student_user_id", studentId),
         supabase.from("library_books").select("id", { count: "exact", head: true }),
-        supabase.from("fee_structure").select("status, amount"),
       ]);
 
       if (noticesRes.error) {
@@ -190,11 +186,6 @@ export function Dashboard() {
 
       setLibraryCount(libraryRes.count || 0);
 
-      const pending = (feesRes.data ?? [])
-        .filter((fee: any) => String(fee.status || "").toLowerCase() !== "paid")
-        .reduce((sum: number, fee: any) => sum + Number(fee.amount || 0), 0);
-      setPendingFees(pending);
-
       setLoading(false);
     };
 
@@ -225,14 +216,6 @@ export function Dashboard() {
       change: libraryCount > 0 ? "Available" : "No books",
       color: "bg-purple-500",
       link: "/student/library",
-    },
-    {
-      icon: DollarSign,
-      label: "Pending Fees",
-      value: `₹${pendingFees}`,
-      change: pendingFees > 0 ? "Pending" : "Paid",
-      color: "bg-cyan-500",
-      link: "/student/fees",
     },
   ];
 

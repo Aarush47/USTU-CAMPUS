@@ -5,16 +5,18 @@ import { useSupabaseTable } from "../../hooks/useSupabaseTable";
 import { BackButton } from "../../components/BackButton";
 import { useUser } from "@clerk/clerk-react";
 
-type AccountRole = "teacher" | "student";
+type AccountRole = "teacher" | "student" | "canteen";
+type UserRole = "admin" | AccountRole;
 
 type UserRow = {
   id: number;
   email: string;
   name: string | null;
-  role: "admin" | "teacher" | "student";
+  role: UserRole;
   is_active: boolean;
   is_approved: boolean;
   is_banned: boolean;
+  canteen_access: boolean;
   requested_at?: string;
   created_at: string;
 };
@@ -33,6 +35,7 @@ export function AdminAccounts() {
   const { data: users = [] } = useSupabaseTable<UserRow>("users", {
     fallbackData: [],
     orderBy: { column: "created_at", ascending: false },
+    select: "id, email, name, role, is_active, is_approved, is_banned, canteen_access, requested_at, created_at",
   });
 
   useEffect(() => {
@@ -109,6 +112,7 @@ export function AdminAccounts() {
         is_active: true,
         is_approved: true,
         is_banned: false,
+        canteen_access: true,
         approved_at: new Date().toISOString(),
         domain_verified: true,
         email_verified: true,
@@ -125,7 +129,7 @@ export function AdminAccounts() {
 
     const { data: insertedUser } = await supabase
       .from("users")
-      .select("id, email, name, role, is_active, is_approved, is_banned, requested_at, created_at")
+      .select("id, email, name, role, is_active, is_approved, is_banned, canteen_access, requested_at, created_at")
       .ilike("email", normalizedEmail)
       .maybeSingle();
 
@@ -150,7 +154,7 @@ export function AdminAccounts() {
     setName("");
   };
 
-  const handleRoleChange = async (target: UserRow, newRole: AccountRole | "admin") => {
+  const handleRoleChange = async (target: UserRow, newRole: UserRole) => {
     setError("");
     setSuccess("");
 
@@ -381,6 +385,38 @@ export function AdminAccounts() {
     });
   };
 
+  const handleToggleCanteenAccess = async (target: UserRow) => {
+    setError("");
+    setSuccess("");
+
+    const nextStatus = !target.canteen_access;
+    const confirmed = window.confirm(
+      nextStatus ? `Enable canteen access for ${target.email}?` : `Disable canteen access for ${target.email}?`
+    );
+    if (!confirmed) return;
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ canteen_access: nextStatus })
+      .eq("id", target.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setUsersState((prev) =>
+      prev.map((u) => (u.id === target.id ? { ...u, canteen_access: nextStatus } : u))
+    );
+
+    setSuccess(nextStatus ? "Canteen access enabled" : "Canteen access disabled");
+
+    await writeAuditLog(nextStatus ? "canteen_access_enabled" : "canteen_access_disabled", target.id, {
+      email: target.email,
+      role: target.role,
+    });
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-4">
@@ -389,7 +425,7 @@ export function AdminAccounts() {
 
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">Manage Accounts</h1>
-        <p className="text-muted-foreground">Add teacher and student email IDs with role access.</p>
+        <p className="text-muted-foreground">Add teacher, student, and canteen email IDs with role access.</p>
         <p className="text-sm text-amber-600 mt-2">Pending requests: {pendingRequestsCount}</p>
       </div>
 
@@ -416,6 +452,7 @@ export function AdminAccounts() {
           >
             <option value="teacher">Teacher</option>
             <option value="student">Student</option>
+            <option value="canteen">Canteen</option>
           </select>
           <button
             type="submit"
@@ -438,6 +475,7 @@ export function AdminAccounts() {
               <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Email</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Name</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Role</th>
+              <th className="px-6 py-3 text-center text-sm font-semibold text-foreground">Canteen Access</th>
               <th className="px-6 py-3 text-right text-sm font-semibold text-foreground">Actions</th>
             </tr>
           </thead>
@@ -451,13 +489,14 @@ export function AdminAccounts() {
                     <select
                       value={u.role}
                       onChange={(e) =>
-                        handleRoleChange(u, e.target.value as AccountRole | "admin")
+                        handleRoleChange(u, e.target.value as UserRole)
                       }
                       className="px-2 py-1 bg-background border border-border rounded-md text-xs"
                     >
                       <option value="admin">Admin</option>
                       <option value="teacher">Teacher</option>
                       <option value="student">Student</option>
+                      <option value="canteen">Canteen</option>
                     </select>
                     {!u.is_active && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
@@ -478,6 +517,26 @@ export function AdminAccounts() {
                       <Shield className="w-4 h-4 text-primary" />
                     )}
                   </div>
+                </td>
+                <td className="px-6 py-3 text-center">
+                  {(u.role === "student" || u.role === "teacher") && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCanteenAccess(u)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        u.canteen_access ? "bg-primary" : "bg-gray-200"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          u.canteen_access ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  )}
+                  {u.role === "admin" && (
+                    <span className="text-xs text-muted-foreground">N/A</span>
+                  )}
                 </td>
                 <td className="px-6 py-3 text-right">
                   <div className="inline-flex items-center gap-2">

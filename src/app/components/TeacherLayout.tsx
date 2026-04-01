@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useClerkUserSync } from "../hooks/useClerkUserSync";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher" },
@@ -112,7 +113,10 @@ export function TeacherLayout() {
                 <p className="font-medium text-foreground">Teacher</p>
                 <p className="text-xs text-muted-foreground">Logged in</p>
               </div>
-              <UserButton />
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <UserButton />
+              </div>
             </div>
           </div>
         </div>
@@ -123,12 +127,15 @@ export function TeacherLayout() {
         {/* Top Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card lg:hidden">
           <h2 className="text-foreground font-semibold">USTU CAMPUS</h2>
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 hover:bg-accent rounded-lg"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1 hover:bg-accent rounded-lg"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Page Content */}

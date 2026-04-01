@@ -1,9 +1,10 @@
-import { Search, ShoppingCart, Plus, Minus, Trash2, Clock, Star } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, Clock, Star, Lock } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { useState } from "react";
-import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { useState, useEffect } from "react";
+import { useUser } from "@clerk/clerk-react";
+import { supabase } from "../lib/supabase";
 
 type MenuItem = {
   id: number;
@@ -14,16 +15,103 @@ type MenuItem = {
   rating: number;
   isVeg: boolean;
   available: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export function Canteen() {
+  const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number }[]>([]);
-  const { data: menuItems, loading } = useSupabaseTable<MenuItem>(["canteen_menu", "menu_items"], {
-    fallbackData: [],
-  });
+  const [hasCanteenAccess, setHasCanteenAccess] = useState<boolean | null>(null);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [menuUpdatedAt, setMenuUpdatedAt] = useState<string | null>(null);
+  const [brokenImageIds, setBrokenImageIds] = useState<Set<number>>(new Set());
+
+  const isImageUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/");
+
+  useEffect(() => {
+    const fetchMenu = async () => {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("canteen_menu")
+        .select("*")
+        .eq("available", true)
+        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching canteen menu:", error);
+        setMenuItems([]);
+        setMenuUpdatedAt(null);
+      } else {
+        const items = data ?? [];
+        setMenuItems(items);
+        const latest = items[0];
+        setMenuUpdatedAt((latest?.updated_at ?? latest?.created_at) || null);
+      }
+
+      setLoading(false);
+    };
+
+    void fetchMenu();
+
+    const channel = supabase
+      .channel("canteen-menu-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "canteen_menu" },
+        () => {
+          void fetchMenu();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
   const categories = ["All", ...Array.from(new Set(menuItems.map((item) => item.category))).filter(Boolean)];
+
+  // Check canteen access
+  useEffect(() => {
+    const checkCanteenAccess = async () => {
+      if (!user?.id) {
+        setCheckingAccess(false);
+        return;
+      }
+
+      try {
+        const email = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
+
+        const { data, error } = await supabase
+          .from("users")
+          .select("canteen_access")
+          .or(`clerk_user_id.eq.${user.id},email.ilike.${email}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error checking canteen access:", error);
+          setHasCanteenAccess(false);
+        } else {
+          setHasCanteenAccess(data?.canteen_access ?? true); // Default to true for backward compatibility
+        }
+      } catch (error) {
+        console.error("Error checking canteen access:", error);
+        setHasCanteenAccess(false);
+      } finally {
+        setCheckingAccess(false);
+      }
+    };
+
+    checkCanteenAccess();
+  }, [user]);
 
   const filteredItems = menuItems.filter((item) => {
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
@@ -73,12 +161,46 @@ export function Canteen() {
     return cart.reduce((total, cartItem) => total + cartItem.quantity, 0);
   };
 
+  // Show loading while checking access
+  if (checkingAccess) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show access denied if no canteen access
+  if (hasCanteenAccess === false) {
+    return (
+      <div className="p-6">
+        <div className="max-w-md mx-auto text-center py-12">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Canteen Access Restricted</h2>
+          <p className="text-muted-foreground mb-6">
+            Your canteen access has been disabled. Please contact your teacher or administrator to enable access.
+          </p>
+          <Button variant="outline" onClick={() => window.history.back()}>
+            Go Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Canteen Menu</h1>
           <p className="text-muted-foreground mt-1">Order your favorite food online</p>
+          {menuUpdatedAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Latest menu update: {new Date(menuUpdatedAt).toLocaleString()}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Clock className="w-4 h-4 text-muted-foreground" />
@@ -123,7 +245,24 @@ export function Canteen() {
             {filteredItems.map((item) => (
               <Card key={item.id} className={`p-4 ${!item.available ? "opacity-60" : ""}`}>
                 <div className="flex gap-4">
-                  <div className="text-5xl">{item.image}</div>
+                  <div className="w-20 h-20 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                    {isImageUrl(item.image) && !brokenImageIds.has(item.id) ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={() =>
+                          setBrokenImageIds((prev) => {
+                            const next = new Set(prev);
+                            next.add(item.id);
+                            return next;
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="text-3xl">🍽️</span>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
                       <div>
@@ -190,7 +329,24 @@ export function Canteen() {
                 <div className="space-y-3 max-h-[400px] overflow-y-auto mb-4">
                   {cart.map((cartItem) => (
                     <div key={cartItem.item.id} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                      <div className="text-2xl">{cartItem.item.image}</div>
+                      <div className="w-10 h-10 rounded-md bg-background flex items-center justify-center overflow-hidden">
+                        {isImageUrl(cartItem.item.image) && !brokenImageIds.has(cartItem.item.id) ? (
+                          <img
+                            src={cartItem.item.image}
+                            alt={cartItem.item.name}
+                            className="w-full h-full object-cover"
+                            onError={() =>
+                              setBrokenImageIds((prev) => {
+                                const next = new Set(prev);
+                                next.add(cartItem.item.id);
+                                return next;
+                              })
+                            }
+                          />
+                        ) : (
+                          <span className="text-lg">🍽️</span>
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{cartItem.item.name}</p>
                         <p className="text-sm text-primary font-semibold">₹{cartItem.item.price}</p>

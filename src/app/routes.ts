@@ -5,7 +5,6 @@ import { NoticeBoard } from "./components/NoticeBoard";
 import { Timetable } from "./components/Timetable";
 import { Library } from "./components/Library";
 import { Attendance } from "./components/Attendance";
-import { Fees } from "./components/Fees";
 import { Feedback } from "./components/Feedback";
 import { MyProfile } from "./components/MyProfile";
 import { Marks } from "./components/Marks";
@@ -34,6 +33,9 @@ import { AdminAccounts } from "./pages/admin/AdminAccounts";
 import { AdminAuditLogs } from "./pages/admin/AdminAuditLogs";
 import { AdminNotices } from "./pages/admin/AdminNotices";
 import { AdminLibrary } from "./pages/admin/AdminLibrary";
+import { CanteenProtectedLayout } from "./components/CanteenProtectedLayout";
+import { CanteenDashboard } from "./pages/canteen/CanteenDashboard";
+import { CanteenMenuManagement } from "./pages/canteen/CanteenMenuManagement";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
@@ -50,7 +52,6 @@ export const router = createBrowserRouter([
       { path: "attendance", Component: Attendance },
       { path: "assignments", Component: StudentAssignments },
       { path: "resources", Component: StudentResources },
-      { path: "fees", Component: Fees },
       { path: "feedback", Component: Feedback },
       { path: "profile", Component: MyProfile },
       { path: "marks", Component: Marks },
@@ -86,6 +87,15 @@ export const router = createBrowserRouter([
       { path: "notices", Component: AdminNotices },
       { path: "library", Component: AdminLibrary },
       { path: "calendar", Component: CalendarView },
+      { path: "profile", Component: MyProfile },
+    ],
+  },
+  {
+    path: "/canteen",
+    Component: CanteenProtectedLayout,
+    children: [
+      { index: true, Component: CanteenDashboard },
+      { path: "menu", Component: CanteenMenuManagement },
       { path: "profile", Component: MyProfile },
     ],
   },

@@ -6,7 +6,6 @@ import {
   Calendar, 
   BookOpen, 
   UserCheck, 
-  DollarSign, 
   MessageSquare, 
   User, 
   Award, 
@@ -21,6 +20,7 @@ import {
 import { useState } from "react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
 import { useClerkUserSync } from "../hooks/useClerkUserSync";
+import { ThemeToggle } from "./ThemeToggle";
 
 type StudentProfile = {
   name?: string;
@@ -36,7 +36,6 @@ const navItems = [
   { icon: UserCheck, label: "Attendance", path: "/student/attendance" },
   { icon: ClipboardList, label: "Assignments", path: "/student/assignments" },
   { icon: FolderOpen, label: "Resources", path: "/student/resources" },
-  { icon: DollarSign, label: "Fees", path: "/student/fees" },
   { icon: MessageSquare, label: "Feedback", path: "/student/feedback" },
   { icon: Award, label: "Marks", path: "/student/marks" },
   { icon: CalendarDays, label: "Calendar", path: "/student/calendar" },
@@ -137,7 +136,10 @@ export function Layout() {
                 <p className="text-xs text-muted-foreground">{student?.roll_no ?? "-"}</p>
               </div>
             </div>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserButton afterSignOutUrl="/sign-in" />
+            </div>
           </div>
         </div>
       </aside>
@@ -153,7 +155,7 @@ export function Layout() {
             <GraduationCap className="w-6 h-6 text-primary" />
             <span className="font-semibold">USTU CAMPUS</span>
           </div>
-          <div className="w-6" />
+          <ThemeToggle />
         </header>
 
         {/* Content Area */}

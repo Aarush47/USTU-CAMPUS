@@ -57,7 +57,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
               (user.unsafeMetadata?.role as string | undefined) ||
               (user.publicMetadata?.role as string | undefined);
             const requestedRole =
-              roleFromMetadata && ["student", "teacher", "admin"].includes(roleFromMetadata)
+              roleFromMetadata && ["student", "teacher", "admin", "canteen"].includes(roleFromMetadata)
                 ? roleFromMetadata
                 : "student";
 
@@ -130,6 +130,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (userRole === "teacher") {
     return <Navigate to="/teacher" replace />;
+  }
+
+  if (userRole === "canteen") {
+    return <Navigate to="/canteen" replace />;
   }
 
   if (hasAccountRecord && !isActive) {
@@ -222,7 +226,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         <div className="max-w-md text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>
           <p className="text-muted-foreground mb-4">
-            Your account is not approved by admin yet. Ask administration to add your email first.
+            Your account does not have student portal access. Please sign in with the correct role account.
           </p>
           <div className="flex items-center justify-center gap-3">
             <a

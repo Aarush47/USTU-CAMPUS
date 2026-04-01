@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation } from "react-router";
 import { UserButton } from "@clerk/clerk-react";
 import { LayoutDashboard, UserPlus, Menu, X, Shield, ScrollText, Bell, BookOpen, User, Calendar } from "lucide-react";
 import { useState } from "react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -87,7 +88,10 @@ export function AdminLayout() {
                 <p className="font-medium text-foreground">Admin</p>
                 <p className="text-xs text-muted-foreground">Full access</p>
               </div>
-              <UserButton />
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <UserButton />
+              </div>
             </div>
           </div>
         </div>
@@ -96,12 +100,15 @@ export function AdminLayout() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card lg:hidden">
           <h2 className="text-foreground font-semibold">USTU CAMPUS Admin</h2>
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 hover:bg-accent rounded-lg"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1 hover:bg-accent rounded-lg"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
