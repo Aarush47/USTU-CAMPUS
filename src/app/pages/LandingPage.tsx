@@ -64,14 +64,14 @@ export function LandingPage() {
             <UserCheck className="w-8 h-8 text-primary mb-3" />
             <h3 className="text-lg font-semibold text-foreground mb-2">Teachers</h3>
             <p className="text-sm text-muted-foreground">
-              Invite students, manage classes, attendance, assignments, and resources.
+              Manage classes, attendance, assignments, and resources.
             </p>
           </div>
           <div className="bg-card border border-border rounded-xl p-6">
             <Users className="w-8 h-8 text-primary mb-3" />
             <h3 className="text-lg font-semibold text-foreground mb-2">Students</h3>
             <p className="text-sm text-muted-foreground">
-              Access the portal only when registered and invited with approved credentials.
+              Access the portal only when approved and pre-registered by administration.
             </p>
           </div>
         </section>

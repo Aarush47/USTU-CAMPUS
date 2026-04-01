@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { Navigate } from "react-router";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -13,9 +13,17 @@ interface TeacherRouteProps {
  */
 export function TeacherRoute({ children }: TeacherRouteProps) {
   const { isSignedIn, isLoaded, user } = useUser();
+  const { signOut } = useClerk();
   const [isTeacher, setIsTeacher] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
+  const [hasAccountRecord, setHasAccountRecord] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+
+  const handleLoginAgain = async () => {
+    await signOut({ redirectUrl: "/sign-in" });
+  };
 
   useEffect(() => {
     const checkTeacherRole = async () => {
@@ -35,26 +43,37 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
+        const normalizedEmail = user.emailAddresses[0].emailAddress.trim().toLowerCase();
 
         // Prefer Clerk user ID lookup, fallback to email for legacy rows.
         const { data, error } = await supabase
           .from("users")
-          .select("role, is_active")
-          .or(`clerk_user_id.eq.${user.id},email.eq.${user.emailAddresses[0].emailAddress}`)
-          .single();
+          .select("role, is_active, is_approved, is_banned")
+          .or(`clerk_user_id.eq.${user.id},email.ilike.${normalizedEmail}`)
+          .limit(1)
+          .maybeSingle();
 
         if (error) {
           console.error("Error checking teacher role:", error);
           setIsTeacher(false);
           setIsActive(false);
+          setIsApproved(false);
+          setIsBanned(false);
+          setHasAccountRecord(false);
         } else {
+          setHasAccountRecord(Boolean(data));
           setIsTeacher(data?.role === "teacher" || data?.role === "admin");
           setIsActive(Boolean(data?.is_active));
+          setIsApproved(Boolean(data?.is_approved));
+          setIsBanned(Boolean(data?.is_banned));
         }
       } catch (err) {
         console.error("Error:", err);
         setIsTeacher(false);
         setIsActive(false);
+        setIsApproved(false);
+        setIsBanned(false);
+        setHasAccountRecord(false);
       } finally {
         setIsChecking(false);
       }
@@ -78,13 +97,79 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
     return <Navigate to="/sign-in" replace />;
   }
 
-  if (!isActive) {
+  if (hasAccountRecord && !isActive) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Account Deactivated</h1>
           <p className="text-muted-foreground mb-4">Your access has been disabled by administration.</p>
-          <a href="/sign-in" className="text-primary hover:underline">Back to Sign In</a>
+          <div className="flex items-center justify-center gap-3">
+            <a
+              href="/"
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-border text-foreground hover:bg-accent"
+            >
+              Go to Dashboard
+            </a>
+            <button
+              type="button"
+              onClick={handleLoginAgain}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Login Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasAccountRecord && isBanned) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Access Banned</h1>
+          <p className="text-muted-foreground mb-4">Your account has been banned by administration.</p>
+          <div className="flex items-center justify-center gap-3">
+            <a
+              href="/"
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-border text-foreground hover:bg-accent"
+            >
+              Go to Dashboard
+            </a>
+            <button
+              type="button"
+              onClick={handleLoginAgain}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Login Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasAccountRecord && !isApproved) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Approval Pending</h1>
+          <p className="text-muted-foreground mb-4">Your teacher account is waiting for admin approval.</p>
+          <div className="flex items-center justify-center gap-3">
+            <a
+              href="/"
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-border text-foreground hover:bg-accent"
+            >
+              Go to Dashboard
+            </a>
+            <button
+              type="button"
+              onClick={handleLoginAgain}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Login Again
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -95,8 +180,22 @@ export function TeacherRoute({ children }: TeacherRouteProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-4">You need teacher permissions to access this portal.</p>
-          <a href="/" className="text-primary hover:underline">Return to Student Portal</a>
+          <p className="text-muted-foreground mb-4">Your teacher account is not approved by admin yet.</p>
+          <div className="flex items-center justify-center gap-3">
+            <a
+              href="/"
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-border text-foreground hover:bg-accent"
+            >
+              Go to Dashboard
+            </a>
+            <button
+              type="button"
+              onClick={handleLoginAgain}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Login Again
+            </button>
+          </div>
         </div>
       </div>
     );

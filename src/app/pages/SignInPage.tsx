@@ -16,7 +16,9 @@ export function SignInPage() {
               card: "bg-card border border-border rounded-lg",
             },
           }}
-          redirectUrl="/student"
+          fallbackRedirectUrl="/student"
+          forceRedirectUrl="/student"
+          signUpUrl="/sign-up"
         />
       </div>
     </div>

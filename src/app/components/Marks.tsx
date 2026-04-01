@@ -2,6 +2,7 @@ import { Card } from "./ui/card";
 import { Award, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Skeleton } from "./ui/skeleton";
 import { useUser } from "@clerk/clerk-react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
 import { useEffect, useMemo, useState } from "react";
@@ -146,6 +147,8 @@ export function Marks() {
     );
   }, [previousSemesters]);
 
+  const showSkeleton = loadingConnectedMarks && studentMarksRows.length === 0;
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -156,6 +159,21 @@ export function Marks() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {showSkeleton && (
+          <>
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <Card key={`marks-stat-skeleton-${idx}`} className="p-5 border border-border">
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+              </Card>
+            ))}
+          </>
+        )}
+        {!showSkeleton && (
+          <>
         <Card className="p-5 border border-border">
           <div className="flex items-start justify-between">
             <div>
@@ -214,6 +232,8 @@ export function Marks() {
             </div>
           </div>
         </Card>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -253,15 +273,29 @@ export function Marks() {
                 </thead>
                 <tbody>
                   {loadingConnectedMarks && semesterMarks.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-6 text-center text-muted-foreground">
-                        Loading marks...
-                      </td>
-                    </tr>
+                    <>
+                      {Array.from({ length: 4 }).map((_, idx) => (
+                        <tr key={`marks-table-skeleton-${idx}`}>
+                          <td colSpan={10} className="py-3 px-4">
+                            <div className="grid grid-cols-10 gap-3 items-center">
+                              <Skeleton className="h-4 w-full col-span-2" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   )}
                   {!loadingConnectedMarks && semesterMarks.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-6 text-center text-muted-foreground">
+                      <td colSpan={10} className="py-6 text-center text-muted-foreground">
                         No marks have been published yet.
                       </td>
                     </tr>

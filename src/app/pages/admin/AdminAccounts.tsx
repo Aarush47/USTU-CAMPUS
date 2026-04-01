@@ -13,6 +13,9 @@ type UserRow = {
   name: string | null;
   role: "admin" | "teacher" | "student";
   is_active: boolean;
+  is_approved: boolean;
+  is_banned: boolean;
+  requested_at?: string;
   created_at: string;
 };
 
@@ -40,22 +43,27 @@ export function AdminAccounts() {
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const isValidDomain = (mail: string) => mail.endsWith("@ustu.edu.in");
+  const isValidDomain = (mail: string) => mail.trim().toLowerCase().endsWith("@ustu.edu.in");
 
   const activeAdminsCount = useMemo(
     () => usersState.filter((u) => u.role === "admin" && u.is_active).length,
     [usersState]
   );
 
+  const pendingRequestsCount = useMemo(
+    () => usersState.filter((u) => !u.is_approved && !u.is_banned).length,
+    [usersState]
+  );
+
   useEffect(() => {
     const resolveActor = async () => {
       if (!user?.id) return;
-      const email = user.primaryEmailAddress?.emailAddress || "";
+      const email = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
 
       const { data } = await supabase
         .from("users")
         .select("id")
-        .or(`clerk_user_id.eq.${user.id},email.eq.${email}`)
+        .or(`clerk_user_id.eq.${user.id},email.ilike.${email}`)
         .limit(1)
         .maybeSingle();
 
@@ -84,8 +92,9 @@ export function AdminAccounts() {
     e.preventDefault();
     setError("");
     setSuccess("");
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!isValidDomain(email)) {
+    if (!isValidDomain(normalizedEmail)) {
       setError("Email must be in @ustu.edu.in domain");
       return;
     }
@@ -94,10 +103,13 @@ export function AdminAccounts() {
 
     const { error: upsertError } = await supabase.from("users").upsert(
       {
-        email,
+        email: normalizedEmail,
         name: name || null,
         role,
         is_active: true,
+        is_approved: true,
+        is_banned: false,
+        approved_at: new Date().toISOString(),
         domain_verified: true,
         email_verified: true,
       },
@@ -113,8 +125,8 @@ export function AdminAccounts() {
 
     const { data: insertedUser } = await supabase
       .from("users")
-      .select("id, email, name, role, is_active, created_at")
-      .eq("email", email)
+      .select("id, email, name, role, is_active, is_approved, is_banned, requested_at, created_at")
+      .ilike("email", normalizedEmail)
       .maybeSingle();
 
     if (insertedUser) {
@@ -210,6 +222,165 @@ export function AdminAccounts() {
     });
   };
 
+  const handlePermanentDelete = async (target: UserRow) => {
+    setError("");
+    setSuccess("");
+
+    const currentAdminEmail = (user?.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
+
+    if (target.email.toLowerCase() === currentAdminEmail) {
+      setError("You cannot permanently delete your own account.");
+      return;
+    }
+
+    if (target.role === "admin" && target.is_active && activeAdminsCount <= 1) {
+      setError("Cannot permanently delete the last active admin.");
+      return;
+    }
+
+    const typed = window.prompt(
+      `Type the exact email to permanently delete this account:\n\n${target.email}`
+    );
+
+    if ((typed || "").trim().toLowerCase() !== target.email.toLowerCase()) {
+      setError("Email confirmation did not match. Delete cancelled.");
+      return;
+    }
+
+    // Write audit log before delete because target row will no longer exist.
+    await writeAuditLog("account_deleted_permanently", target.id, {
+      email: target.email,
+      role: target.role,
+      was_active: target.is_active,
+    });
+
+    const { error: deleteError } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", target.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setUsersState((prev) => prev.filter((u) => u.id !== target.id));
+    setSuccess("Account permanently deleted.");
+  };
+
+  const handleApproveAccount = async (target: UserRow) => {
+    setError("");
+    setSuccess("");
+
+    if (target.is_approved) {
+      setSuccess("Account is already approved.");
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        is_approved: true,
+        is_banned: false,
+        is_active: true,
+        approved_at: new Date().toISOString(),
+        banned_at: null,
+      })
+      .eq("id", target.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setUsersState((prev) =>
+      prev.map((u) =>
+        u.id === target.id ? { ...u, is_approved: true, is_banned: false, is_active: true } : u
+      )
+    );
+    setSuccess("Account approved successfully.");
+
+    await writeAuditLog("account_approved", target.id, {
+      email: target.email,
+      role: target.role,
+    });
+  };
+
+  const handleBanAccount = async (target: UserRow) => {
+    setError("");
+    setSuccess("");
+
+    const currentAdminEmail = (user?.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
+    if (target.email.toLowerCase() === currentAdminEmail) {
+      setError("You cannot ban your own account.");
+      return;
+    }
+
+    if (target.role === "admin" && target.is_active && activeAdminsCount <= 1) {
+      setError("Cannot ban the last active admin.");
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        is_banned: true,
+        is_approved: false,
+        is_active: false,
+        banned_at: new Date().toISOString(),
+      })
+      .eq("id", target.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setUsersState((prev) =>
+      prev.map((u) =>
+        u.id === target.id ? { ...u, is_banned: true, is_approved: false, is_active: false } : u
+      )
+    );
+    setSuccess("Account banned successfully.");
+
+    await writeAuditLog("account_banned", target.id, {
+      email: target.email,
+      role: target.role,
+    });
+  };
+
+  const handleUnbanAccount = async (target: UserRow) => {
+    setError("");
+    setSuccess("");
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        is_banned: false,
+        is_approved: false,
+        is_active: true,
+        banned_at: null,
+      })
+      .eq("id", target.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setUsersState((prev) =>
+      prev.map((u) =>
+        u.id === target.id ? { ...u, is_banned: false, is_approved: false, is_active: true } : u
+      )
+    );
+    setSuccess("Account unbanned. Approve to allow portal access.");
+
+    await writeAuditLog("account_unbanned", target.id, {
+      email: target.email,
+      role: target.role,
+    });
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-4">
@@ -219,6 +390,7 @@ export function AdminAccounts() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-1">Manage Accounts</h1>
         <p className="text-muted-foreground">Add teacher and student email IDs with role access.</p>
+        <p className="text-sm text-amber-600 mt-2">Pending requests: {pendingRequestsCount}</p>
       </div>
 
       <div className="bg-card border border-border rounded-lg p-6 mb-6">
@@ -292,6 +464,16 @@ export function AdminAccounts() {
                         Inactive
                       </span>
                     )}
+                    {!u.is_approved && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
+                        Pending Approval
+                      </span>
+                    )}
+                    {u.is_banned && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">
+                        Banned
+                      </span>
+                    )}
                     {u.role === "admin" && (
                       <Shield className="w-4 h-4 text-primary" />
                     )}
@@ -299,6 +481,32 @@ export function AdminAccounts() {
                 </td>
                 <td className="px-6 py-3 text-right">
                   <div className="inline-flex items-center gap-2">
+                    {!u.is_banned && !u.is_approved && (
+                      <button
+                        type="button"
+                        onClick={() => handleApproveAccount(u)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 transition-colors text-sm"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {!u.is_banned ? (
+                      <button
+                        type="button"
+                        onClick={() => handleBanAccount(u)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-500/40 text-red-600 hover:bg-red-500/10 transition-colors text-sm"
+                      >
+                        Ban
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleUnbanAccount(u)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-600 hover:bg-amber-500/10 transition-colors text-sm"
+                      >
+                        Unban
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleToggleActive(u)}
@@ -306,6 +514,14 @@ export function AdminAccounts() {
                     >
                       {u.is_active ? <Trash2 className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
                       {u.is_active ? "Deactivate" : "Activate"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePermanentDelete(u)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors text-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Permanently
                     </button>
                   </div>
                 </td>

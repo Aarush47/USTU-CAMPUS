@@ -24,12 +24,16 @@ import { TeacherClasses } from "./pages/teacher/TeacherClasses";
 import { TeacherAttendance } from "./pages/teacher/TeacherAttendance";
 import { TeacherAssignments } from "./pages/teacher/TeacherAssignments";
 import { TeacherResources } from "./pages/teacher/TeacherResources";
-import { ManageStudents } from "./pages/teacher/ManageStudents";
 import { TeacherMarks } from "./pages/teacher/TeacherMarks";
+import { TeacherNotices } from "./pages/teacher/TeacherNotices";
+import { TeacherTimetable } from "./pages/teacher/TeacherTimetable";
+import { TeacherLibrary } from "./pages/teacher/TeacherLibrary";
 import { AdminProtectedLayout } from "./components/AdminProtectedLayout";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminAccounts } from "./pages/admin/AdminAccounts";
 import { AdminAuditLogs } from "./pages/admin/AdminAuditLogs";
+import { AdminNotices } from "./pages/admin/AdminNotices";
+import { AdminLibrary } from "./pages/admin/AdminLibrary";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
@@ -64,8 +68,12 @@ export const router = createBrowserRouter([
       { path: "assignments", Component: TeacherAssignments },
       { path: "resources", Component: TeacherResources },
       { path: "marks", Component: TeacherMarks },
+      { path: "notices", Component: TeacherNotices },
+      { path: "timetable", Component: TeacherTimetable },
+      { path: "library", Component: TeacherLibrary },
       { path: "whiteboard", Component: Whiteboard },
-      { path: "students", Component: ManageStudents },
+      { path: "calendar", Component: CalendarView },
+      { path: "profile", Component: MyProfile },
     ],
   },
   {
@@ -75,6 +83,10 @@ export const router = createBrowserRouter([
       { index: true, Component: AdminDashboard },
       { path: "accounts", Component: AdminAccounts },
       { path: "audit", Component: AdminAuditLogs },
+      { path: "notices", Component: AdminNotices },
+      { path: "library", Component: AdminLibrary },
+      { path: "calendar", Component: CalendarView },
+      { path: "profile", Component: MyProfile },
     ],
   },
 ]);

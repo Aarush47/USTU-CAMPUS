@@ -9,10 +9,11 @@ import {
   FileText,
   Award,
   PenTool,
+  Bell,
   Menu,
   X,
   GraduationCap,
-  UserPlus
+  User,
 } from "lucide-react";
 import { useState } from "react";
 import { useClerkUserSync } from "../hooks/useClerkUserSync";
@@ -20,12 +21,16 @@ import { useClerkUserSync } from "../hooks/useClerkUserSync";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/teacher" },
   { icon: Users, label: "Classes", path: "/teacher/classes" },
-  { icon: UserPlus, label: "Manage Students", path: "/teacher/students" },
   { icon: Calendar, label: "Attendance", path: "/teacher/attendance" },
   { icon: ClipboardList, label: "Assignments", path: "/teacher/assignments" },
   { icon: FileText, label: "Resources", path: "/teacher/resources" },
   { icon: Award, label: "Marks", path: "/teacher/marks" },
+  { icon: Bell, label: "Notices", path: "/teacher/notices" },
+  { icon: Calendar, label: "Timetable", path: "/teacher/timetable" },
+  { icon: BookOpen, label: "Library PDFs", path: "/teacher/library" },
   { icon: PenTool, label: "Whiteboard", path: "/teacher/whiteboard" },
+  { icon: Calendar, label: "Academic Calendar", path: "/teacher/calendar" },
+  { icon: User, label: "My Profile", path: "/teacher/profile" },
 ];
 
 export function TeacherLayout() {

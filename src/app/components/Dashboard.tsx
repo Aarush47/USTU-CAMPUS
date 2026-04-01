@@ -1,159 +1,228 @@
 import { Link } from "react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
-import { 
-  BookOpen, 
-  UserCheck, 
-  DollarSign, 
+import {
+  BookOpen,
+  UserCheck,
+  DollarSign,
   Award,
   Bell,
   Calendar,
   TrendingUp,
-  Clock
+  Clock,
 } from "lucide-react";
 import { Card } from "./ui/card";
-import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { supabase } from "../lib/supabase";
 
 type NoticeItem = {
   id: number;
   title: string;
-  date: string;
+  date?: string;
+  created_at?: string;
   category: string;
   urgent?: boolean;
 };
 
-type ClassItem = {
-  id?: number;
-  time: string;
+type TodayClassItem = {
+  id: number;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
   subject: string;
   room: string;
-  status: "completed" | "ongoing" | "upcoming";
 };
 
 type EventItem = {
-  id?: number;
-  date: string;
+  id: number;
   title: string;
-  type: "deadline" | "event" | "exam";
-};
-
-type AttendanceBySubject = {
-  percentage: number;
-};
-
-type MarksRow = {
-  total: number;
-  maxMarks: number;
-};
-
-type IssuedBookRow = {
-  status?: string;
-};
-
-type FeeRow = {
-  status: string;
-  amount: number;
+  due_date: string;
 };
 
 export function Dashboard() {
   const { user } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [displayName, setDisplayName] = useState("Student");
 
-  const {
-    data: recentNotices,
-    loading: noticesLoading,
-  } = useSupabaseTable<NoticeItem>(["notices", "notice_board"], {
-    fallbackData: [],
-    orderBy: { column: "date", ascending: false },
-    limit: 4,
-  });
+  const [recentNotices, setRecentNotices] = useState<NoticeItem[]>([]);
+  const [todaysClasses, setTodaysClasses] = useState<TodayClassItem[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
 
-  const {
-    data: todaysClasses,
-    loading: classesLoading,
-  } = useSupabaseTable<ClassItem>(["todays_classes", "classes"], {
-    fallbackData: [],
-    orderBy: { column: "time", ascending: true },
-  });
+  const [attendanceAvg, setAttendanceAvg] = useState<number | null>(null);
+  const [marksAvg, setMarksAvg] = useState<number | null>(null);
+  const [libraryCount, setLibraryCount] = useState(0);
+  const [pendingFees, setPendingFees] = useState(0);
 
-  const {
-    data: upcomingEvents,
-    loading: eventsLoading,
-  } = useSupabaseTable<EventItem>(["upcoming_events", "events"], {
-    fallbackData: [],
-    orderBy: { column: "date", ascending: true },
-    limit: 4,
-  });
+  const currentTime = new Date().toTimeString().slice(0, 5);
 
-  const { data: attendanceRows } = useSupabaseTable<AttendanceBySubject>(
-    ["attendance_by_subject"],
-    { fallbackData: [] }
+  const todaysClassesWithStatus = useMemo(
+    () =>
+      todaysClasses.map((cls) => {
+        let status: "completed" | "ongoing" | "upcoming" = "upcoming";
+        if (currentTime >= cls.end_time.slice(0, 5)) {
+          status = "completed";
+        } else if (currentTime >= cls.start_time.slice(0, 5) && currentTime < cls.end_time.slice(0, 5)) {
+          status = "ongoing";
+        }
+
+        return {
+          ...cls,
+          time: `${cls.start_time.slice(0, 5)} - ${cls.end_time.slice(0, 5)}`,
+          status,
+        };
+      }),
+    [todaysClasses, currentTime]
   );
 
-  const { data: marksRows } = useSupabaseTable<MarksRow>(["semester_marks"], {
-    fallbackData: [],
-  });
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
 
-  const { data: issuedBooks } = useSupabaseTable<IssuedBookRow>(["issued_books"], {
-    fallbackData: [],
-  });
+      setLoading(true);
+      setError("");
 
-  const { data: feeRows } = useSupabaseTable<FeeRow>(["fee_structure"], {
-    fallbackData: [],
-  });
+      const normalizedEmail = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
 
-  const { data: profiles } = useSupabaseTable<{ name?: string }>(["student_profile"], {
-    fallbackData: [],
-  });
+      const { data: studentRow, error: studentError } = await supabase
+        .from("users")
+        .select("id, name")
+        .or(`clerk_user_id.eq.${user.id},email.ilike.${normalizedEmail}`)
+        .limit(1)
+        .maybeSingle();
 
-  const attendanceAvg =
-    attendanceRows.length > 0
-      ? Math.round(
-          attendanceRows.reduce((sum, row) => sum + Number(row.percentage || 0), 0) /
-            attendanceRows.length
-        )
-      : null;
+      if (studentError || !studentRow?.id) {
+        setError("Could not load student profile.");
+        setLoading(false);
+        return;
+      }
 
-  const marksAvg =
-    marksRows.length > 0
-      ? (
-          marksRows.reduce((sum, row) => sum + Number(row.total || 0), 0) /
-          marksRows.length
-        ).toFixed(1)
-      : null;
+      setDisplayName(studentRow.name || user.firstName || normalizedEmail.split("@")[0] || "Student");
 
-  const activeBooks = issuedBooks.filter((book) => book.status !== "Returned").length;
+      const studentId = studentRow.id;
 
-  const pendingFees = feeRows
-    .filter((fee) => fee.status.toLowerCase() !== "paid")
-    .reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+      const { data: enrollments } = await supabase
+        .from("class_enrollments")
+        .select("class_id")
+        .eq("student_user_id", studentId);
 
-  const displayName =
-    profiles[0]?.name ||
-    user?.firstName ||
-    user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-    "Student";
+      const classIds = (enrollments ?? []).map((row: any) => row.class_id);
+
+      const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+
+      const [
+        noticesRes,
+        timetableRes,
+        assignmentsRes,
+        attendanceRes,
+        marksRes,
+        libraryRes,
+        feesRes,
+      ] = await Promise.all([
+        supabase
+          .from("notices")
+          .select("id, title, date, created_at, category, urgent")
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(4),
+        classIds.length > 0
+          ? supabase
+              .from("class_timetables")
+              .select("id, day_of_week, start_time, end_time, subject, room")
+              .in("class_id", classIds)
+              .eq("day_of_week", dayOfWeek)
+              .order("start_time", { ascending: true })
+          : Promise.resolve({ data: [], error: null } as any),
+        classIds.length > 0
+          ? supabase
+              .from("assignments")
+              .select("id, title, due_date")
+              .in("class_id", classIds)
+              .gte("due_date", new Date().toISOString().slice(0, 10))
+              .order("due_date", { ascending: true })
+              .limit(4)
+          : Promise.resolve({ data: [], error: null } as any),
+        supabase
+          .from("attendance_records")
+          .select("status")
+          .eq("student_user_id", studentId),
+        supabase
+          .from("student_marks")
+          .select("total, max_marks")
+          .eq("student_user_id", studentId),
+        supabase.from("library_books").select("id", { count: "exact", head: true }),
+        supabase.from("fee_structure").select("status, amount"),
+      ]);
+
+      if (noticesRes.error) {
+        setError(noticesRes.error.message);
+      }
+
+      setRecentNotices((noticesRes.data ?? []) as NoticeItem[]);
+      setTodaysClasses((timetableRes.data ?? []) as TodayClassItem[]);
+      setUpcomingEvents((assignmentsRes.data ?? []) as EventItem[]);
+
+      const attendanceRows = attendanceRes.data ?? [];
+      if (attendanceRows.length > 0) {
+        const presentLike = attendanceRows.filter(
+          (row: any) => row.status === "Present" || row.status === "Late"
+        ).length;
+        setAttendanceAvg(Math.round((presentLike / attendanceRows.length) * 100));
+      } else {
+        setAttendanceAvg(null);
+      }
+
+      const marksRows = marksRes.data ?? [];
+      if (marksRows.length > 0) {
+        const pct =
+          marksRows.reduce((sum: number, row: any) => {
+            const maxMarks = Number(row.max_marks || 0);
+            const total = Number(row.total || 0);
+            if (!maxMarks) return sum;
+            return sum + (total / maxMarks) * 100;
+          }, 0) / marksRows.length;
+        setMarksAvg(Number(pct.toFixed(1)));
+      } else {
+        setMarksAvg(null);
+      }
+
+      setLibraryCount(libraryRes.count || 0);
+
+      const pending = (feesRes.data ?? [])
+        .filter((fee: any) => String(fee.status || "").toLowerCase() !== "paid")
+        .reduce((sum: number, fee: any) => sum + Number(fee.amount || 0), 0);
+      setPendingFees(pending);
+
+      setLoading(false);
+    };
+
+    void fetchDashboardData();
+  }, [user?.id]);
 
   const stats = [
     {
       icon: UserCheck,
       label: "Attendance",
       value: attendanceAvg !== null ? `${attendanceAvg}%` : "--",
-      change: attendanceRows.length > 0 ? "Live" : "No data",
+      change: attendanceAvg !== null ? "Live" : "No data",
       color: "bg-emerald-500",
       link: "/student/attendance",
     },
     {
       icon: Award,
       label: "Average Marks",
-      value: marksAvg !== null ? marksAvg : "--",
-      change: marksRows.length > 0 ? "Live" : "No data",
+      value: marksAvg !== null ? `${marksAvg}%` : "--",
+      change: marksAvg !== null ? "Live" : "No data",
       color: "bg-primary",
       link: "/student/marks",
     },
     {
       icon: BookOpen,
-      label: "Books Issued",
-      value: String(activeBooks),
-      change: issuedBooks.length > 0 ? "Live" : "No data",
+      label: "Library PDFs",
+      value: String(libraryCount),
+      change: libraryCount > 0 ? "Available" : "No books",
       color: "bg-purple-500",
       link: "/student/library",
     },
@@ -169,13 +238,13 @@ export function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-semibold text-foreground mb-2">Welcome back, {displayName}! 👋</h1>
-        <p className="text-muted-foreground">Here's what's happening with your academics today.</p>
+        <p className="text-muted-foreground">Here is what is happening with your academics today.</p>
       </div>
 
-      {/* Stats Grid */}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -202,24 +271,21 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Schedule */}
         <Card className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold">Today's Classes</h2>
+              <h2 className="text-xl font-semibold">Today&apos;s Classes</h2>
             </div>
             <Link to="/student/timetable" className="text-sm text-primary hover:underline">
               View Full Schedule
             </Link>
           </div>
           <div className="space-y-3">
-            {classesLoading && (
-              <p className="text-sm text-muted-foreground">Loading classes from Supabase...</p>
-            )}
-            {todaysClasses.map((cls, index) => (
-              <div key={index} className="flex items-center gap-4 p-3 bg-muted rounded-lg">
-                <div className="flex flex-col items-center min-w-[80px]">
+            {loading && <p className="text-sm text-muted-foreground">Loading classes from Supabase...</p>}
+            {todaysClassesWithStatus.map((cls) => (
+              <div key={cls.id} className="flex items-center gap-4 p-3 bg-muted rounded-lg">
+                <div className="flex flex-col items-center min-w-[100px]">
                   <span className="text-xs text-muted-foreground">Time</span>
                   <span className="text-sm font-medium">{cls.time}</span>
                 </div>
@@ -228,59 +294,54 @@ export function Dashboard() {
                   <p className="font-medium text-foreground">{cls.subject}</p>
                   <p className="text-sm text-muted-foreground">{cls.room}</p>
                 </div>
-                <div>
-                  <span className={`text-xs px-3 py-1 rounded-full ${
-                    cls.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                    cls.status === 'ongoing' ? 'bg-blue-100 text-blue-700' :
-                    'bg-amber-100 text-amber-700'
-                  }`}>
-                    {cls.status}
-                  </span>
-                </div>
+                <span
+                  className={`text-xs px-3 py-1 rounded-full ${
+                    cls.status === "completed"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : cls.status === "ongoing"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {cls.status}
+                </span>
               </div>
             ))}
-            {!classesLoading && todaysClasses.length === 0 && (
-              <p className="text-sm text-muted-foreground">No classes scheduled yet.</p>
+            {!loading && todaysClassesWithStatus.length === 0 && (
+              <p className="text-sm text-muted-foreground">No classes scheduled today.</p>
             )}
           </div>
         </Card>
 
-        {/* Upcoming Events */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold">Upcoming Events</h2>
+            <h2 className="text-xl font-semibold">Upcoming Deadlines</h2>
           </div>
           <div className="space-y-3">
-            {eventsLoading && (
-              <p className="text-sm text-muted-foreground">Loading events from Supabase...</p>
-            )}
-            {upcomingEvents.map((event, index) => (
-              <div key={index} className="flex gap-3">
-                <div className="flex flex-col items-center min-w-[50px] p-2 bg-secondary rounded-lg">
-                  <span className="text-xs text-secondary-foreground font-medium">{event.date.split(' ')[0]}</span>
-                  <span className="text-xs text-muted-foreground">{event.date.split(' ')[1]}</span>
+            {loading && <p className="text-sm text-muted-foreground">Loading events from Supabase...</p>}
+            {upcomingEvents.map((event) => (
+              <div key={event.id} className="flex gap-3">
+                <div className="min-w-[88px] p-2 bg-secondary rounded-lg text-center">
+                  <span className="text-xs text-secondary-foreground font-medium">
+                    {new Date(event.due_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                  </span>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{event.title}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
-                    event.type === 'exam' ? 'bg-red-100 text-red-700' :
-                    event.type === 'deadline' ? 'bg-amber-100 text-amber-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {event.type}
+                  <span className="text-xs px-2 py-0.5 rounded-full inline-block mt-1 bg-amber-100 text-amber-700">
+                    Assignment
                   </span>
                 </div>
               </div>
             ))}
-            {!eventsLoading && upcomingEvents.length === 0 && (
-              <p className="text-sm text-muted-foreground">No upcoming events.</p>
+            {!loading && upcomingEvents.length === 0 && (
+              <p className="text-sm text-muted-foreground">No upcoming deadlines.</p>
             )}
           </div>
         </Card>
       </div>
 
-      {/* Recent Notices */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -292,20 +353,23 @@ export function Dashboard() {
           </Link>
         </div>
         <div className="space-y-3">
-          {noticesLoading && (
-            <p className="text-sm text-muted-foreground">Loading notices from Supabase...</p>
-          )}
+          {loading && <p className="text-sm text-muted-foreground">Loading notices from Supabase...</p>}
           {recentNotices.map((notice) => (
-            <div key={notice.id} className="flex items-start justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+            <div
+              key={notice.id}
+              className="flex items-start justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+            >
               <div className="flex-1">
                 <div className="flex items-start gap-2">
-                  {notice.urgent && (
-                    <span className="mt-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  )}
+                  {notice.urgent && <span className="mt-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
                   <div>
                     <p className="font-medium text-foreground">{notice.title}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {new Date(notice.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      {new Date(notice.date || notice.created_at || Date.now()).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -315,7 +379,7 @@ export function Dashboard() {
               </span>
             </div>
           ))}
-          {!noticesLoading && recentNotices.length === 0 && (
+          {!loading && recentNotices.length === 0 && (
             <p className="text-sm text-muted-foreground">No notices available right now.</p>
           )}
         </div>

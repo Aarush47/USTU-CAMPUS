@@ -14,83 +14,20 @@ export function UpdatedSignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [referenceCode, setReferenceCode] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [invitationValid, setInvitationValid] = useState(false);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Validate email domain
-  const isValidDomain = (email: string) => {
-    return email.endsWith("@ustu.edu.in");
-  };
-
-  // Check if student invitation exists
-  const validateInvitation = async (code: string, studentEmail: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("student_invitations")
-        .select("*")
-        .eq("reference_code", code)
-        .eq("email", studentEmail)
-        .eq("status", "pending")
-        .single();
-
-      if (error) {
-        setInvitationValid(false);
-        setError("Invalid reference code or email doesn't match invitation");
-        return false;
-      }
-
-      if (data) {
-        setInvitationValid(true);
-        setSuccess("✅ Invitation verified! Ready to signup.");
-        return true;
-      }
-    } catch (err) {
-      console.error("Error validating invitation:", err);
-    }
-    return false;
-  };
-
-  const handleCheckInvitation = async () => {
-    if (!email || !referenceCode) {
-      setError("Please enter both email and reference code");
-      return;
-    }
-
-    if (!isValidDomain(email)) {
-      setError("❌ Email must be in @ustu.edu.in domain");
-      return;
-    }
-
-    setIsLoading(true);
-    setError("");
-    setSuccess("");
-
-    const isValid = await validateInvitation(referenceCode, email);
-    setIsLoading(false);
-
-    if (!isValid) {
-      setInvitationValid(false);
-    }
-  };
-
   const handleSignUp = async (e: React.FormEvent, role: "teacher" | "student") => {
     e.preventDefault();
     setError("");
+    const normalizedEmail = email.trim().toLowerCase();
 
     if (!isLoaded) return;
-
-    // Validate domain
-    if (!isValidDomain(email)) {
-      setError("❌ Email must be @ustu.edu.in to register");
-      return;
-    }
 
     // Validate passwords
     if (password !== confirmPassword) {
@@ -103,17 +40,12 @@ export function UpdatedSignUpPage() {
       return;
     }
 
-    // For students: verify invitation
-    if (role === "student" && !invitationValid) {
-      setError("❌ Please verify your invitation first");
-      return;
-    }
-
-    // Enforce admin pre-registration for both teacher and student accounts.
+    // Admin approval flow: existing pre-registered users can sign up directly;
+    // unknown users are created as pending approval.
     const { data: preRegisteredUser, error: preRegError } = await supabase
       .from("users")
-      .select("role, is_active")
-      .eq("email", email)
+      .select("role, is_active, is_approved")
+      .ilike("email", normalizedEmail)
       .maybeSingle();
 
     if (preRegError) {
@@ -121,17 +53,12 @@ export function UpdatedSignUpPage() {
       return;
     }
 
-    if (!preRegisteredUser) {
-      setError("❌ This email is not authorized by administration yet");
-      return;
-    }
-
-    if (!preRegisteredUser.is_active) {
+    if (preRegisteredUser && !preRegisteredUser.is_active) {
       setError("❌ This account is deactivated by administration");
       return;
     }
 
-    if (preRegisteredUser.role !== role) {
+    if (preRegisteredUser && preRegisteredUser.role !== role) {
       setError(`❌ This email is registered as ${preRegisteredUser.role}, not ${role}`);
       return;
     }
@@ -141,7 +68,7 @@ export function UpdatedSignUpPage() {
     try {
       // Create Clerk account
       const result = await signUp.create({
-        emailAddress: email,
+        emailAddress: normalizedEmail,
         password,
       });
 
@@ -150,7 +77,6 @@ export function UpdatedSignUpPage() {
         await signUp.update({
           unsafeMetadata: {
             role,
-            referenceCode: role === "student" ? referenceCode : null,
           },
         });
 
@@ -160,11 +86,14 @@ export function UpdatedSignUpPage() {
           .upsert([
             {
               clerk_user_id: result.createdUserId,
-              email,
+              email: normalizedEmail,
               role,
-              name: email.split("@")[0],
-              domain_verified: true,
+              name: normalizedEmail.split("@")[0],
+              domain_verified: normalizedEmail.endsWith("@ustu.edu.in"),
               email_verified: true,
+              is_approved: preRegisteredUser ? preRegisteredUser.is_approved : false,
+              is_banned: false,
+              requested_at: new Date().toISOString(),
             },
           ], { onConflict: "email" });
 
@@ -173,23 +102,11 @@ export function UpdatedSignUpPage() {
           // Continue anyway - user exists in Clerk
         }
 
-        // If student: mark invitation as accepted
-        if (role === "student") {
-          const { error: updateError } = await supabase
-            .from("student_invitations")
-            .update({
-              status: "accepted",
-              accepted_at: new Date().toISOString(),
-            })
-            .eq("reference_code", referenceCode)
-            .eq("email", email);
-
-          if (updateError) {
-            console.error("Error updating invitation:", updateError);
-          }
+        if (preRegisteredUser && preRegisteredUser.is_approved) {
+          setSuccess("✅ Account created successfully! Redirecting...");
+        } else {
+          setSuccess("✅ Account created. Waiting for admin approval before portal access.");
         }
-
-        setSuccess("✅ Account created successfully! Redirecting...");
         setTimeout(() => navigate("/sign-in"), 2000);
       }
     } catch (err: any) {
@@ -252,7 +169,7 @@ export function UpdatedSignUpPage() {
             <form onSubmit={(e) => handleSignUp(e, "teacher")} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Email (@ustu.edu.in)
+                  Email
                 </label>
                 <div className="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-lg focus-within:border-primary">
                   <Mail className="w-5 h-5 text-muted-foreground" />
@@ -260,7 +177,7 @@ export function UpdatedSignUpPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="teacher@ustu.edu.in"
+                    placeholder="teacher@example.com"
                     className="flex-1 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none"
                     required
                   />
@@ -344,93 +261,26 @@ export function UpdatedSignUpPage() {
               ← Back
             </button>
 
-            {!invitationValid ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleCheckInvitation();
-                }}
-                className="space-y-4"
-              >
-                <h3 className="font-semibold text-foreground mb-4">
-                  Get your invitation details from your teacher
-                </h3>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Email (@ustu.edu.in)
-                  </label>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-lg focus-within:border-primary">
-                    <Mail className="w-5 h-5 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="student@ustu.edu.in"
-                      className="flex-1 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Reference Code (from teacher)
-                  </label>
-                  <input
-                    type="text"
-                    value={referenceCode}
-                    onChange={(e) => setReferenceCode(e.target.value.toUpperCase())}
-                    placeholder="USTU-ABC123"
-                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
-                    required
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
-
-                {success && (
-                  <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                    <p className="text-sm text-green-600">{success}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isLoading && <Loader className="w-4 h-4 animate-spin" />}
-                  Verify Invitation
-                </button>
-              </form>
-            ) : (
-              <form
-                onSubmit={(e) => handleSignUp(e, "student")}
-                className="space-y-4"
-              >
-                <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg mb-4">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <p className="text-sm text-green-600">Invitation verified!</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Email
-                  </label>
+            <form
+              onSubmit={(e) => handleSignUp(e, "student")}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Email
+                </label>
+                <div className="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-lg focus-within:border-primary">
+                  <Mail className="w-5 h-5 text-muted-foreground" />
                   <input
                     type="email"
                     value={email}
-                    disabled
-                    className="w-full px-4 py-2 bg-accent border border-border rounded-lg text-foreground opacity-50"
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="student@example.com"
+                    className="flex-1 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none"
+                    required
                   />
                 </div>
+              </div>
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
@@ -466,34 +316,29 @@ export function UpdatedSignUpPage() {
                   </div>
                 </div>
 
-                {error && (
-                  <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
 
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isLoading && <Loader className="w-4 h-4 animate-spin" />}
-                  Complete Signup
-                </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {isLoading && <Loader className="w-4 h-4 animate-spin" />}
+                Sign up as Student
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInvitationValid(false);
-                    setReferenceCode("");
-                  }}
-                  className="w-full py-2 px-4 border border-border text-foreground rounded-lg hover:bg-accent transition-colors"
-                >
-                  Use Different Code
-                </button>
-              </form>
-            )}
+              {success && (
+                <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <p className="text-sm text-green-600">{success}</p>
+                </div>
+              )}
+            </form>
 
             <p className="text-sm text-muted-foreground text-center mt-4">
               Already have an account?{" "}

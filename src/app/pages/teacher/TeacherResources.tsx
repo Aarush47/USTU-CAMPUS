@@ -25,6 +25,7 @@ export function TeacherResources() {
   const [teacherId, setTeacherId] = useState<number | null>(null);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     classId: "",
@@ -115,14 +116,51 @@ export function TeacherResources() {
       return;
     }
 
+    const requiresFile = ["pdf", "ppt", "document"].includes(formData.type);
+    const requiresUrl = ["link", "video", "slide"].includes(formData.type);
+
+    if (requiresFile && !selectedFile) {
+      setError("Please select a file to upload.");
+      return;
+    }
+
+    if (requiresUrl && !formData.url.trim()) {
+      setError("Resource URL is required for links, videos, and slide decks.");
+      return;
+    }
+
     setSaving(true);
+
+    let resolvedUrl = formData.url.trim() || null;
+
+    if (requiresFile && selectedFile) {
+      const fileExt = selectedFile.name.split(".").pop() || "file";
+      const safeTitle = formData.title.trim().replace(/[^a-zA-Z0-9-_]/g, "-").toLowerCase();
+      const filePath = `teacher-${teacherId}/${Date.now()}-${safeTitle}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("learning-resources")
+        .upload(filePath, selectedFile, { upsert: false });
+
+      if (uploadError) {
+        setSaving(false);
+        setError("File upload failed. Ensure Supabase storage bucket 'learning-resources' exists and is public.");
+        return;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("learning-resources")
+        .getPublicUrl(filePath);
+
+      resolvedUrl = publicData.publicUrl;
+    }
 
     const { error: createError } = await supabase.from("learning_resources").insert({
       class_id: Number(formData.classId),
       uploaded_by_teacher_id: teacherId,
       title: formData.title.trim(),
       resource_type: formData.type,
-      url: formData.url.trim() || null,
+      url: resolvedUrl,
       description: formData.description.trim() || null,
     });
 
@@ -136,6 +174,7 @@ export function TeacherResources() {
     await fetchResources(teacherId, classes);
     setSuccess("Resource uploaded successfully.");
     setFormData({ title: "", classId: "", type: "link", url: "", description: "" });
+    setSelectedFile(null);
     setShowUploadForm(false);
   };
 
@@ -235,6 +274,9 @@ export function TeacherResources() {
                   <option value="notes">Notes</option>
                   <option value="slide">Slide Deck</option>
                   <option value="video">Video</option>
+                  <option value="pdf">PDF Document</option>
+                  <option value="ppt">PPT Presentation</option>
+                  <option value="document">Document (DOC/DOCX)</option>
                 </select>
               </div>
               <div>
@@ -246,10 +288,31 @@ export function TeacherResources() {
                   value={formData.url}
                   onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                   placeholder="https://..."
+                  disabled={["pdf", "ppt", "document"].includes(formData.type)}
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
+
+            {["pdf", "ppt", "document"].includes(formData.type) && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Upload File
+                </label>
+                <input
+                  type="file"
+                  accept={
+                    formData.type === "pdf"
+                      ? ".pdf"
+                      : formData.type === "ppt"
+                        ? ".ppt,.pptx"
+                        : ".doc,.docx,.txt"
+                  }
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground"
+                />
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-foreground mb-2">
@@ -315,7 +378,7 @@ export function TeacherResources() {
                   {resource.title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {resource.className} • {resource.type} • {new Date(resource.uploadedAt).toLocaleDateString("en-IN")}
+                  {resource.className} • {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)} • {new Date(resource.uploadedAt).toLocaleDateString("en-IN")}
                 </p>
                 {resource.url && (
                   <a

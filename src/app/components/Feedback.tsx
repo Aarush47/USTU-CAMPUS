@@ -1,40 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { MessageSquare, Star, Send, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseTable } from "../hooks/useSupabaseTable";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { useUser } from "@clerk/clerk-react";
 
 type SubjectItem = {
-  id?: number;
+  id: number;
   name: string;
-  professor: string;
+  subject: string;
+  teacher_name: string;
   submitted?: boolean;
 };
 
-type CategoryItem = {
-  id?: number;
-  name: string;
-};
+const FEEDBACK_CATEGORIES = [
+  "Course Content",
+  "Teaching Quality",
+  "Pace & Difficulty",
+  "Course Materials",
+  "Overall Experience",
+];
 
 export function Feedback() {
+  const { user } = useUser();
   const [ratings, setRatings] = useState<{ [key: string]: number }>({});
   const [comment, setComment] = useState("");
+  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [submittedFeedback, setSubmittedFeedback] = useState<number[]>([]);
 
-  const { data: subjects, loading: subjectsLoading } = useSupabaseTable<SubjectItem>(
-    ["feedback_subjects", "subjects"],
-    { fallbackData: [] },
-  );
+  useEffect(() => {
+    const loadSubjects = async () => {
+      if (!isSupabaseConfigured || !user?.id) {
+        setSubjectsLoading(false);
+        return;
+      }
 
-  const { data: feedbackCategories } = useSupabaseTable<CategoryItem>(
-    ["feedback_categories", "categories"],
-    { fallbackData: [] },
-  );
+      try {
+        // Get student's enrolled classes with teacher names
+        const { data: enrolledClasses, error } = await supabase
+          .from("class_enrollments")
+          .select("class_id, classes(id, name, subject, teacher_id, users(id, name))")
+          .eq("student_user_id", (await supabase.auth.getUser()).data.user?.id);
 
-  const [selectedSubjectName, setSelectedSubjectName] = useState<string>("");
-  const selectedSubject = subjects.find((s) => s.name === selectedSubjectName) ?? subjects[0];
+        if (error) throw error;
+
+        const classesWithTeachers = enrolledClasses?.map((enrollment: any) => ({
+          id: enrollment.classes.id,
+          name: enrollment.classes.name,
+          subject: enrollment.classes.subject,
+          teacher_name: enrollment.classes.users?.name || "Unknown",
+        })) || [];
+
+        setSubjects(classesWithTeachers);
+
+        // Load previously submitted feedback
+        const { data: submitted } = await supabase
+          .from("feedback_submissions")
+          .select("class_id")
+          .eq("student_user_id", (await supabase.auth.getUser()).data.user?.id);
+
+        setSubmittedFeedback(submitted?.map((f: any) => f.class_id) || []);
+      } catch {
+        console.error("Failed to load subjects");
+      } finally {
+        setSubjectsLoading(false);
+      }
+    };
+
+    loadSubjects();
+  }, [user]);
+
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const selectedSubject = subjects.find((s) => s.id === selectedSubjectId) ?? subjects[0];
 
   const handleRating = (category: string, rating: number) => {
     setRatings({ ...ratings, [category]: rating });
@@ -46,8 +86,8 @@ export function Feedback() {
       return;
     }
 
-    const categoryNames = feedbackCategories.map((c) => c.name);
-    const allRated = categoryNames.length > 0 && categoryNames.every((cat) => ratings[cat] !== undefined);
+    // Check if all categories are rated
+    const allRated = FEEDBACK_CATEGORIES.every((cat) => ratings[cat] !== undefined);
 
     if (!allRated) {
       toast.error("Please rate all categories before submitting");
@@ -59,22 +99,37 @@ export function Feedback() {
       return;
     }
 
-    const { error } = await supabase.from("feedback_submissions").insert({
-      subject: selectedSubject.name,
-      professor: selectedSubject.professor,
-      ratings,
-      comment,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        toast.error("Not authenticated");
+        return;
+      }
 
-    if (error) {
+      const { error } = await supabase.from("feedback_submissions").insert({
+        class_id: selectedSubject.id,
+        student_user_id: authUser.id,
+        ratings: JSON.stringify(ratings),
+        comment,
+        created_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("You have already submitted feedback for this course");
+        } else {
+          toast.error("Failed to submit feedback");
+        }
+        return;
+      }
+
+      toast.success("Feedback submitted successfully!");
+      setRatings({});
+      setComment("");
+      setSubmittedFeedback([...submittedFeedback, selectedSubject.id]);
+    } catch {
       toast.error("Failed to submit feedback");
-      return;
     }
-
-    toast.success("Feedback submitted successfully!");
-    setRatings({});
-    setComment("");
   };
 
   const averageRating =
@@ -82,7 +137,7 @@ export function Feedback() {
       ? Object.values(ratings).reduce((sum, val) => sum + val, 0) / Object.values(ratings).length
       : 0;
 
-  const submittedCount = subjects.filter((s) => s.submitted).length;
+  const submittedCount = submittedFeedback.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -132,57 +187,62 @@ export function Feedback() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="p-6 border border-border lg:col-span-1">
           <h2 className="text-lg font-semibold text-foreground mb-4">Select Subject</h2>
-          {subjectsLoading && <p className="text-sm text-muted-foreground mb-3">Loading subjects from Supabase...</p>}
+          {subjectsLoading && <p className="text-sm text-muted-foreground mb-3">Loading your courses...</p>}
           <div className="space-y-2">
             {subjects.map((subject) => (
               <button
-                key={subject.name}
-                onClick={() => setSelectedSubjectName(subject.name)}
+                key={subject.id}
+                onClick={() => setSelectedSubjectId(subject.id)}
+                disabled={submittedFeedback.includes(subject.id)}
                 className={`w-full p-4 rounded-lg border text-left transition-all ${
-                  selectedSubject?.name === subject.name
+                  selectedSubject?.id === subject.id
                     ? "border-primary bg-accent"
                     : "border-border bg-card hover:border-primary hover:bg-secondary"
-                }`}
+                } ${submittedFeedback.includes(subject.id) ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h4 className="font-medium text-foreground">{subject.name}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{subject.professor}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{subject.teacher_name}</p>
                   </div>
-                  {subject.submitted && <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 ml-2" />}
+                  {submittedFeedback.includes(subject.id) && (
+                    <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 ml-2" />
+                  )}
                 </div>
               </button>
             ))}
             {subjects.length === 0 && !subjectsLoading && (
-              <p className="text-sm text-muted-foreground">No subjects available in database.</p>
+              <p className="text-sm text-muted-foreground">No enrolled courses found.</p>
             )}
           </div>
         </Card>
 
         <Card className="p-6 border border-border lg:col-span-2">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-foreground">{selectedSubject?.name ?? "Select a subject"}</h2>
-            <p className="text-sm text-muted-foreground mt-1">Professor: {selectedSubject?.professor ?? "-"}</p>
+            <h2 className="text-xl font-semibold text-foreground">{selectedSubject?.name ?? "Select a course"}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Course: {selectedSubject?.subject ?? "-"} | Teacher: {selectedSubject?.teacher_name ?? "-"}
+            </p>
           </div>
 
-          {selectedSubject ? (
+          {selectedSubject && !submittedFeedback.includes(selectedSubject.id) ? (
             <div className="space-y-6">
-              {feedbackCategories.map((category) => (
-                <div key={category.name}>
-                  <label className="block text-sm font-medium text-foreground mb-3">{category.name}</label>
+              {FEEDBACK_CATEGORIES.map((category) => (
+                <div key={category}>
+                  <label className="block text-sm font-medium text-foreground mb-3">{category}</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <button
                         key={rating}
-                        onClick={() => handleRating(category.name, rating)}
+                        onClick={() => handleRating(category, rating)}
                         className={`flex-1 p-3 rounded-lg border transition-all ${
-                          ratings[category.name] === rating
+                          ratings[category] === rating
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border bg-card hover:border-primary hover:bg-secondary"
                         }`}
                       >
                         <Star
-                          className={`w-6 h-6 mx-auto ${ratings[category.name] === rating ? "fill-current" : ""}`}
+                          className={`w-6 h-6 mx-auto ${ratings[category] === rating ? "fill-current" : ""}`}
                         />
                         <span className="text-xs mt-1 block">{rating}</span>
                       </button>
@@ -215,9 +275,15 @@ export function Feedback() {
                 Submit Feedback
               </Button>
             </div>
+          ) : submittedFeedback.includes(selectedSubject?.id || 0) ? (
+            <div className="text-center py-12">
+              <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground">Feedback Submitted</h3>
+              <p className="text-muted-foreground mt-2">Thank you for your feedback on this course.</p>
+            </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No subject selected.</p>
+              <p className="text-muted-foreground">No course selected.</p>
             </div>
           )}
         </Card>

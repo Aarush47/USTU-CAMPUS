@@ -9,9 +9,11 @@ type Notice = {
   id: number;
   title: string;
   content: string;
-  date: string;
+  date?: string;
+  created_at?: string;
   category: string;
-  author: string;
+  author?: string;
+  posted_by_name?: string;
   pinned: boolean;
   urgent: boolean;
 };
@@ -36,7 +38,9 @@ export function NoticeBoard() {
     .sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
+      const bDate = b.date || b.created_at || "1970-01-01";
+      const aDate = a.date || a.created_at || "1970-01-01";
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
 
   return (
@@ -122,7 +126,7 @@ export function NoticeBoard() {
                   <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(notice.date).toLocaleDateString('en-IN', { 
+                      <span>{new Date(notice.date || notice.created_at || Date.now()).toLocaleDateString('en-IN', {
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric' 
@@ -130,7 +134,7 @@ export function NoticeBoard() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <User className="w-4 h-4" />
-                      <span>{notice.author}</span>
+                      <span>{notice.author || notice.posted_by_name || "Administration"}</span>
                     </div>
                     <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
                       {notice.category}

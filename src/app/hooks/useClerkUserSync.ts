@@ -24,7 +24,7 @@ export function useClerkUserSync() {
             ? roleFromMetadata
             : null;
 
-        const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
+        const primaryEmail = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
         const displayName =
           user.firstName && user.lastName
             ? `${user.firstName} ${user.lastName}`
@@ -34,7 +34,7 @@ export function useClerkUserSync() {
         const { data: existingUser } = await supabase
           .from("users")
           .select("role")
-          .or(`clerk_user_id.eq.${user.id},email.eq.${primaryEmail}`)
+          .or(`clerk_user_id.eq.${user.id},email.ilike.${primaryEmail}`)
           .limit(1)
           .maybeSingle();
 

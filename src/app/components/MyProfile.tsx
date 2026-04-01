@@ -1,220 +1,370 @@
-import { Mail, Phone, MapPin, Calendar, Award, GraduationCap, BookOpen, Edit } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router";
+import { useUser } from "@clerk/clerk-react";
+import { Mail, Phone, MapPin, Calendar, Edit, Save, X, UserRound } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { useSupabaseTable } from "../hooks/useSupabaseTable";
+import { BackButton } from "./BackButton";
+import { supabase } from "../lib/supabase";
 
-type StudentProfile = {
+type UserProfile = {
+  id: number;
+  email: string;
+  name: string | null;
+  role: "student" | "teacher" | "admin";
+  phone?: string | null;
+  address?: string | null;
+  date_of_birth?: string | null;
+  blood_group?: string | null;
+  department?: string | null;
+  bio?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type EditableProfile = {
   name: string;
-  roll_no?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  date_of_birth?: string;
-  blood_group?: string;
-  department?: string;
-  semester?: string;
-  batch?: string;
-  admission_date?: string;
+  phone: string;
+  address: string;
+  date_of_birth: string;
+  blood_group: string;
+  department: string;
+  bio: string;
 };
 
-type AcademicInfo = {
-  current_cgpa?: string | number;
-  total_credits?: string | number;
-  attendance?: string;
-  rank?: string;
-};
-
-type SkillItem = {
-  id?: number;
-  name: string;
-};
-
-type AchievementItem = {
-  id?: number;
-  title: string;
-  date?: string;
-  type?: string;
-};
-
-const formatDate = (value?: string) => {
+const formatDate = (value?: string | null) => {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 };
 
-const achievementIcon = (type?: string) => {
-  const normalized = type?.toLowerCase();
-  if (normalized === "academic") return GraduationCap;
-  if (normalized === "research") return BookOpen;
-  return Award;
+const defaultForm: EditableProfile = {
+  name: "",
+  phone: "",
+  address: "",
+  date_of_birth: "",
+  blood_group: "",
+  department: "",
+  bio: "",
 };
 
 export function MyProfile() {
-  const { data: profiles } = useSupabaseTable<StudentProfile>(["student_profile", "profile", "students"], {
-    fallbackData: [],
-  });
-  const { data: academics } = useSupabaseTable<AcademicInfo>(
-    ["academic_info", "student_academics", "academics"],
-    {
-      fallbackData: [],
-    },
-  );
-  const { data: skills } = useSupabaseTable<SkillItem>(["student_skills", "skills"], {
-    fallbackData: [],
-  });
-  const { data: achievements } = useSupabaseTable<AchievementItem>(
-    ["student_achievements", "achievements"],
-    {
-      fallbackData: [],
-    },
-  );
+  const { user } = useUser();
+  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [form, setForm] = useState<EditableProfile>(defaultForm);
 
-  const studentInfo = profiles[0];
-  const academicInfo = academics[0];
-  const initials = studentInfo?.name
-    ? studentInfo.name
-        .split(" ")
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "NA";
+  const fallbackPath = useMemo(() => {
+    if (location.pathname.startsWith("/teacher")) return "/teacher";
+    if (location.pathname.startsWith("/admin")) return "/admin";
+    return "/student";
+  }, [location.pathname]);
+
+  const fetchProfile = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const normalizedEmail = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
+
+    const { data, error: profileError } = await supabase
+      .from("users")
+      .select("id, email, name, role, phone, address, date_of_birth, blood_group, department, bio, created_at, updated_at")
+      .or(`clerk_user_id.eq.${user.id},email.ilike.${normalizedEmail}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      setError(profileError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!data) {
+      const roleFromMetadata =
+        (user.unsafeMetadata?.role as string | undefined) ||
+        (user.publicMetadata?.role as string | undefined);
+      const resolvedRole =
+        roleFromMetadata && ["student", "teacher", "admin"].includes(roleFromMetadata)
+          ? (roleFromMetadata as "student" | "teacher" | "admin")
+          : "student";
+
+      const { data: created, error: createError } = await supabase
+        .from("users")
+        .upsert(
+          {
+            clerk_user_id: user.id,
+            email: normalizedEmail,
+            role: resolvedRole,
+            name: user.fullName || normalizedEmail.split("@")[0],
+            email_verified: true,
+            domain_verified: normalizedEmail.endsWith("@ustu.edu.in"),
+            is_active: true,
+            is_approved: false,
+            is_banned: false,
+          },
+          { onConflict: "email" }
+        )
+        .select("id, email, name, role, phone, address, date_of_birth, blood_group, department, bio, created_at, updated_at")
+        .single();
+
+      if (createError || !created) {
+        setError(createError?.message || "Could not create profile record.");
+        setLoading(false);
+        return;
+      }
+
+      setProfile(created as UserProfile);
+      setForm({
+        name: created.name || "",
+        phone: created.phone || "",
+        address: created.address || "",
+        date_of_birth: created.date_of_birth || "",
+        blood_group: created.blood_group || "",
+        department: created.department || "",
+        bio: created.bio || "",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const row = data as UserProfile;
+    setProfile(row);
+    setForm({
+      name: row.name || "",
+      phone: row.phone || "",
+      address: row.address || "",
+      date_of_birth: row.date_of_birth || "",
+      blood_group: row.blood_group || "",
+      department: row.department || "",
+      bio: row.bio || "",
+    });
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void fetchProfile();
+  }, [user?.id]);
+
+  const handleSave = async () => {
+    if (!profile?.id) return;
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    const payload = {
+      name: form.name.trim() || null,
+      phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      date_of_birth: form.date_of_birth || null,
+      blood_group: form.blood_group.trim() || null,
+      department: form.department.trim() || null,
+      bio: form.bio.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase.from("users").update(payload).eq("id", profile.id);
+
+    setSaving(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSuccess("Profile updated successfully.");
+    setIsEditing(false);
+    await fetchProfile();
+  };
+
+  const handleCancel = () => {
+    if (!profile) return;
+    setForm({
+      name: profile.name || "",
+      phone: profile.phone || "",
+      address: profile.address || "",
+      date_of_birth: profile.date_of_birth || "",
+      blood_group: profile.blood_group || "",
+      department: profile.department || "",
+      bio: profile.bio || "",
+    });
+    setIsEditing(false);
+    setError("");
+    setSuccess("");
+  };
+
+  const initials = useMemo(() => {
+    const source = profile?.name || profile?.email || "NA";
+    return source
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [profile?.name, profile?.email]);
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold text-foreground">My Profile</h1>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Profile
-        </Button>
+      <div className="mb-2">
+        <BackButton fallbackPath={fallbackPath} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Card */}
-        <Card className="lg:col-span-1 p-6">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-32 h-32 bg-primary rounded-full flex items-center justify-center mb-4">
-              <span className="text-4xl font-bold text-white">{initials}</span>
-            </div>
-            <h2 className="text-2xl font-semibold text-foreground">{studentInfo?.name ?? "No profile found"}</h2>
-            <p className="text-muted-foreground mb-2">{studentInfo?.roll_no ?? "-"}</p>
-            <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-              {studentInfo?.department ?? "-"}
-            </span>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-semibold text-foreground">My Profile</h1>
+        {!isEditing ? (
+          <Button onClick={() => setIsEditing(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Profile
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleCancel}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? "Saving..." : "Save"}
+            </Button>
           </div>
+        )}
+      </div>
 
-          <div className="mt-6 space-y-4">
-            <div className="flex items-center gap-3 text-sm">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">{studentInfo?.email ?? "-"}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Phone className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">{studentInfo?.phone ?? "-"}</span>
-            </div>
-            <div className="flex items-start gap-3 text-sm">
-              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-              <span className="text-foreground">{studentInfo?.address ?? "-"}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">{formatDate(studentInfo?.date_of_birth)}</span>
-            </div>
-          </div>
-        </Card>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {success && <p className="text-sm text-green-600">{success}</p>}
+      {loading && <p className="text-sm text-muted-foreground">Loading profile...</p>}
 
-        {/* Details Section */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Academic Information */}
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-foreground mb-4">Academic Information</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-accent rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Current CGPA</p>
-                <p className="text-2xl font-semibold text-accent-foreground">{academicInfo?.current_cgpa ?? "-"}</p>
+      {!loading && profile && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-1 p-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-28 h-28 bg-primary rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl font-bold text-white">{initials}</span>
               </div>
-              <div className="p-4 bg-accent rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Credits</p>
-                <p className="text-2xl font-semibold text-accent-foreground">{academicInfo?.total_credits ?? "-"}</p>
-              </div>
-              <div className="p-4 bg-accent rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Attendance</p>
-                <p className="text-2xl font-semibold text-accent-foreground">{academicInfo?.attendance ?? "-"}</p>
-              </div>
-              <div className="p-4 bg-accent rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Class Rank</p>
-                <p className="text-2xl font-semibold text-accent-foreground">{academicInfo?.rank ?? "-"}</p>
-              </div>
+              <h2 className="text-2xl font-semibold text-foreground">{profile.name || "No name"}</h2>
+              <p className="text-muted-foreground capitalize">{profile.role}</p>
+              <span className="mt-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                {profile.department || "Department not set"}
+              </span>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Semester</p>
-                <p className="text-base font-medium text-foreground">{studentInfo?.semester ?? "-"}</p>
+            <div className="mt-6 space-y-4 text-sm">
+              <div className="flex items-center gap-3 text-foreground">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <span>{profile.email}</span>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Batch</p>
-                <p className="text-base font-medium text-foreground">{studentInfo?.batch ?? "-"}</p>
+              <div className="flex items-center gap-3 text-foreground">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                <span>{profile.phone || "-"}</span>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Blood Group</p>
-                <p className="text-base font-medium text-foreground">{studentInfo?.blood_group ?? "-"}</p>
+              <div className="flex items-start gap-3 text-foreground">
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                <span>{profile.address || "-"}</span>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Admission Date</p>
-                <p className="text-base font-medium text-foreground">{formatDate(studentInfo?.admission_date)}</p>
+              <div className="flex items-center gap-3 text-foreground">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span>{formatDate(profile.date_of_birth)}</span>
+              </div>
+              <div className="flex items-center gap-3 text-foreground">
+                <UserRound className="w-4 h-4 text-muted-foreground" />
+                <span>Blood Group: {profile.blood_group || "-"}</span>
               </div>
             </div>
           </Card>
 
-          {/* Skills */}
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-foreground mb-4">Skills & Expertise</h3>
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill) => (
-                <span
-                  key={skill.id ?? skill.name}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-full text-sm"
-                >
-                  {skill.name}
-                </span>
-              ))}
-              {skills.length === 0 && <p className="text-sm text-muted-foreground">No skills found in database.</p>}
-            </div>
-          </Card>
-
-          {/* Achievements */}
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-foreground mb-4">Achievements & Awards</h3>
-            <div className="space-y-3">
-              {achievements.map((achievement) => {
-                const Icon = achievementIcon(achievement.type);
-                return (
-                  <div key={achievement.id ?? achievement.title} className="flex items-center gap-4 p-4 bg-accent rounded-lg">
-                    <div className="p-3 bg-primary rounded-lg">
-                      <Icon className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{achievement.title}</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(achievement.date)}</p>
-                    </div>
-                  </div>
-                );
-              })}
-              {achievements.length === 0 && (
-                <p className="text-sm text-muted-foreground">No achievements found in database.</p>
-              )}
+          <Card className="lg:col-span-2 p-6">
+            <h3 className="text-xl font-semibold text-foreground mb-4">Profile Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg disabled:opacity-70"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={form.phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg disabled:opacity-70"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">Date of Birth</label>
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={(e) => setForm((prev) => ({ ...prev, date_of_birth: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg disabled:opacity-70"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">Blood Group</label>
+                <input
+                  type="text"
+                  value={form.blood_group}
+                  onChange={(e) => setForm((prev) => ({ ...prev, blood_group: e.target.value }))}
+                  disabled={!isEditing}
+                  placeholder="A+, O-, ..."
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg disabled:opacity-70"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-muted-foreground mb-1">Department</label>
+                <input
+                  type="text"
+                  value={form.department}
+                  onChange={(e) => setForm((prev) => ({ ...prev, department: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg disabled:opacity-70"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-muted-foreground mb-1">Address</label>
+                <textarea
+                  rows={3}
+                  value={form.address}
+                  onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg resize-none disabled:opacity-70"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-muted-foreground mb-1">Bio</label>
+                <textarea
+                  rows={3}
+                  value={form.bio}
+                  onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg resize-none disabled:opacity-70"
+                />
+              </div>
             </div>
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }
