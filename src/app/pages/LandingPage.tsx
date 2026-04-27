@@ -18,6 +18,7 @@ import book1 from "../../assets/book-1.jpg";
 import book2 from "../../assets/book-2.jpg";
 import book3 from "../../assets/book-3.jpg";
 import contactImg from "../../assets/contact-student.jpg";
+import siteLogo from "../../logo.webp";
 
 const navLinks = [
   { label: "Facilities", href: "#facilities" },
@@ -120,10 +121,11 @@ export function LandingPage() {
           }`}
         >
           <a href="#top" className="flex items-center gap-2">
-            <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center font-display text-sm">U</span>
-            <span className={`font-display text-lg tracking-tight ${scrolled ? "text-foreground" : "text-white"}`}>
-              USTU<span className="text-accent">Campus</span>
-            </span>
+            <img
+              src={siteLogo}
+              alt="USTU Campus"
+              className={`h-10 w-auto rounded-md object-contain bg-white/90 p-1 shadow-sm ${scrolled ? "" : "ring-1 ring-black/5"}`}
+            />
           </a>
           <nav className="hidden md:flex items-center gap-8">
             {navLinks.map((item) => (
@@ -590,10 +592,7 @@ export function LandingPage() {
           <div className="grid md:grid-cols-4 gap-12 pb-14 border-b border-cream/10">
             <div className="md:col-span-2">
               <div className="flex items-center gap-2">
-                <span className="h-9 w-9 rounded-full bg-cream text-cocoa grid place-items-center font-display">U</span>
-                <span className="font-display text-xl">
-                  USTU<span className="text-accent">Campus</span>
-                </span>
+                <img src={siteLogo} alt="USTU Campus" className="h-14 w-auto rounded-md object-contain bg-white p-1 shadow-sm" />
               </div>
               <p className="mt-5 text-cream/70 max-w-sm leading-relaxed">
                 Smart, simple, connected campus life - beautifully designed for the way students learn today.

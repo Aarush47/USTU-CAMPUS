@@ -1,8 +1,9 @@
 import { Link, Outlet, useLocation } from "react-router";
 import { UserButton } from "@clerk/clerk-react";
-import { LayoutDashboard, UserPlus, Menu, X, Shield, ScrollText, Bell, BookOpen, User, Calendar } from "lucide-react";
+import { LayoutDashboard, UserPlus, Menu, X, ScrollText, Bell, BookOpen, User, Calendar } from "lucide-react";
 import { useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import siteLogo from "../../logo.webp";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -38,11 +39,8 @@ export function AdminLayout() {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-primary-foreground" />
-              </div>
+              <img src={siteLogo} alt="USTU Campus" className="w-24 h-auto rounded-md bg-white p-1 shadow-sm" />
               <div>
-                <h1 className="text-xl font-semibold text-foreground">USTU CAMPUS</h1>
                 <p className="text-xs text-muted-foreground">Administration</p>
               </div>
             </div>
@@ -99,7 +97,7 @@ export function AdminLayout() {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card lg:hidden">
-          <h2 className="text-foreground font-semibold">USTU CAMPUS Admin</h2>
+          <img src={siteLogo} alt="USTU Campus" className="w-28 h-auto rounded-md bg-white p-1 shadow-sm" />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <button

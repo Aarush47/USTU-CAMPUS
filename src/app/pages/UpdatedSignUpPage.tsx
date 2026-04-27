@@ -3,6 +3,7 @@ import { useSignUp } from "@clerk/clerk-react";
 import { useNavigate } from "react-router";
 import { Mail, Lock, AlertCircle, CheckCircle, Loader } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
+import siteLogo from "../../logo.webp";
 
 type SignupMode = "role-select" | "teacher" | "student";
 
@@ -121,9 +122,7 @@ export function UpdatedSignUpPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            USTU CAMPUS
-          </h1>
+          <img src={siteLogo} alt="USTU Campus" className="mx-auto w-44 h-auto rounded-md bg-white p-2 shadow-sm mb-4" />
           <p className="text-muted-foreground">Create your account</p>
         </div>
 

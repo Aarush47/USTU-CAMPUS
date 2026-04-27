@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useSupabaseTable } from "../hooks/useSupabaseTable";
 import { useClerkUserSync } from "../hooks/useClerkUserSync";
 import { ThemeToggle } from "./ThemeToggle";
+import siteLogo from "../../logo.webp";
 
 type StudentProfile = {
   name?: string;
@@ -82,11 +83,8 @@ export function Layout() {
           {/* Logo */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-primary-foreground" />
-              </div>
+              <img src={siteLogo} alt="USTU Campus" className="w-24 h-auto rounded-md bg-white p-1 shadow-sm" />
               <div>
-                <h1 className="text-xl font-semibold text-foreground">USTU CAMPUS</h1>
                 <p className="text-xs text-muted-foreground">College Portal</p>
               </div>
             </div>
@@ -152,8 +150,7 @@ export function Layout() {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-6 h-6 text-primary" />
-            <span className="font-semibold">USTU CAMPUS</span>
+            <img src={siteLogo} alt="USTU Campus" className="w-28 h-auto rounded-md bg-white p-1 shadow-sm" />
           </div>
           <ThemeToggle />
         </header>
