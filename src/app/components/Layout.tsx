@@ -63,7 +63,7 @@ export function Layout() {
     : "NA";
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -75,7 +75,7 @@ export function Layout() {
       {/* Sidebar */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-64 bg-card border-r border-border
+        w-[18rem] sm:w-72 lg:w-80 bg-card border-r border-border
         transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -83,7 +83,7 @@ export function Layout() {
           {/* Logo */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <img src={siteLogo} alt="USTU Campus" className="w-24 h-auto rounded-md bg-white p-1 shadow-sm" />
+              <img src={siteLogo} alt="USTU Campus" className="h-10 sm:h-11 w-auto max-w-[7rem] rounded-md bg-white p-1 shadow-sm" />
               <div>
                 <p className="text-xs text-muted-foreground">College Portal</p>
               </div>
@@ -150,7 +150,7 @@ export function Layout() {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <img src={siteLogo} alt="USTU Campus" className="w-28 h-auto rounded-md bg-white p-1 shadow-sm" />
+            <img src={siteLogo} alt="USTU Campus" className="h-9 w-auto max-w-[7rem] rounded-md bg-white p-1 shadow-sm" />
           </div>
           <ThemeToggle />
         </header>

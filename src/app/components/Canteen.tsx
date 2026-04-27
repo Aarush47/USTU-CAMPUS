@@ -19,6 +19,13 @@ type MenuItem = {
   updated_at?: string;
 };
 
+type CanteenOrderItem = {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+};
+
 export function Canteen() {
   const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -30,6 +37,9 @@ export function Canteen() {
   const [loading, setLoading] = useState(true);
   const [menuUpdatedAt, setMenuUpdatedAt] = useState<string | null>(null);
   const [brokenImageIds, setBrokenImageIds] = useState<Set<number>>(new Set());
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [placedToken, setPlacedToken] = useState<number | null>(null);
+  const [placedOrderTotal, setPlacedOrderTotal] = useState<number | null>(null);
 
   const isImageUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/");
 
@@ -159,6 +169,48 @@ export function Canteen() {
 
   const getTotalItems = () => {
     return cart.reduce((total, cartItem) => total + cartItem.quantity, 0);
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!user?.id || cart.length === 0) return;
+
+    setPlacingOrder(true);
+
+    try {
+      const customerName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.fullName || user.primaryEmailAddress?.emailAddress || "Student";
+      const email = user.primaryEmailAddress?.emailAddress || null;
+      const subtotal = getTotalPrice();
+      const gst = Math.round(subtotal * 0.05);
+      const total = subtotal + gst;
+      const items = cart.map((cartItem) => ({
+        id: cartItem.item.id,
+        name: cartItem.item.name,
+        price: cartItem.item.price,
+        quantity: cartItem.quantity,
+      })) satisfies CanteenOrderItem[];
+
+      const { data, error } = await supabase.rpc("create_canteen_order", {
+        p_clerk_user_id: user.id,
+        p_customer_name: customerName,
+        p_email: email,
+        p_items: items,
+        p_subtotal: subtotal,
+        p_gst: gst,
+        p_total: total,
+      });
+
+      if (error) throw error;
+
+      const tokenNumber = typeof data === "string" ? Number(data) : Number(data);
+      setPlacedToken(Number.isFinite(tokenNumber) ? tokenNumber : null);
+      setPlacedOrderTotal(total);
+      setCart([]);
+    } catch (error) {
+      console.error("Error placing canteen order:", error);
+      alert("Could not place your order right now. Please try again.");
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   // Show loading while checking access
@@ -318,6 +370,19 @@ export function Canteen() {
               )}
             </div>
 
+            {placedToken && (
+              <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center">
+                <p className="text-sm font-medium text-green-700">Order placed successfully</p>
+                <p className="mt-1 text-sm text-green-700">
+                  Token number: <span className="font-semibold">#{placedToken}</span>
+                </p>
+                {placedOrderTotal !== null && (
+                  <p className="mt-1 text-xs text-green-700/80">Total paid: ₹{placedOrderTotal}</p>
+                )}
+                <p className="mt-2 text-xs text-green-700/80">Show this token at the canteen counter.</p>
+              </div>
+            )}
+
             {cart.length === 0 ? (
               <div className="text-center py-8">
                 <div className="text-5xl mb-4">🛒</div>
@@ -397,8 +462,12 @@ export function Canteen() {
                   </div>
                 </div>
 
-                <Button className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90">
-                  Place Order
+                <Button
+                  className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={handlePlaceOrder}
+                  disabled={cart.length === 0 || placingOrder}
+                >
+                  {placingOrder ? "Placing Order..." : "Place Order"}
                 </Button>
               </>
             )}

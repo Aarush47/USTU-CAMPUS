@@ -20,7 +20,7 @@ export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -31,7 +31,7 @@ export function AdminLayout() {
       <aside
         className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-64 bg-card border-r border-border
+        w-[18rem] sm:w-72 lg:w-80 bg-card border-r border-border
         transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}
@@ -39,7 +39,7 @@ export function AdminLayout() {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between px-6 py-5 border-b border-border">
             <div className="flex items-center gap-3">
-              <img src={siteLogo} alt="USTU Campus" className="w-24 h-auto rounded-md bg-white p-1 shadow-sm" />
+              <img src={siteLogo} alt="USTU Campus" className="h-10 sm:h-11 w-auto max-w-[7rem] rounded-md bg-white p-1 shadow-sm" />
               <div>
                 <p className="text-xs text-muted-foreground">Administration</p>
               </div>
@@ -97,7 +97,7 @@ export function AdminLayout() {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card lg:hidden">
-          <img src={siteLogo} alt="USTU Campus" className="w-28 h-auto rounded-md bg-white p-1 shadow-sm" />
+          <img src={siteLogo} alt="USTU Campus" className="h-9 w-auto max-w-[7rem] rounded-md bg-white p-1 shadow-sm" />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <button
