@@ -140,6 +140,20 @@ export function LandingPage() {
               </a>
             ))}
           </nav>
+          <div className="flex items-center gap-2 md:hidden">
+            <Link
+              to="/sign-in"
+              className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/sign-up"
+              className="inline-flex items-center rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+            >
+              Sign up
+            </Link>
+          </div>
           <Link
             to="/sign-in"
             className="hidden md:inline-flex items-center rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
