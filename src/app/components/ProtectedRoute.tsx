@@ -37,12 +37,39 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       try {
         const email = (user.primaryEmailAddress?.emailAddress || "").trim().toLowerCase();
 
-        const { data, error } = await supabase
+        // Query by clerk_user_id first, then fallback to email lookup.
+        let data: any = null;
+        let error: any = null;
+
+        const byClerk = await supabase
           .from("users")
           .select("role, is_active, is_approved, is_banned")
-          .or(`clerk_user_id.eq.${user.id},email.ilike.${email}`)
-          .limit(1)
+          .eq("clerk_user_id", user.id)
           .maybeSingle();
+
+        if (byClerk.error) {
+          console.warn("Access check (by clerk_user_id) error:", byClerk.error);
+        }
+
+        if (byClerk.data) {
+          data = byClerk.data;
+        } else {
+          const byEmail = await supabase
+            .from("users")
+            .select("role, is_active, is_approved, is_banned")
+            .ilike("email", email)
+            .maybeSingle();
+
+          if (byEmail.error) {
+            console.warn("Access check (by email) error:", byEmail.error);
+          }
+
+          if (byEmail.data) {
+            data = byEmail.data;
+          }
+        }
+
+        error = null; // errors are already logged above
 
         if (error) {
           console.error("Access check failed:", error);
